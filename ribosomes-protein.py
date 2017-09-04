@@ -3,45 +3,41 @@
 
 import hoomd
 import hoomd.md
+import random
 
 # All length units specified in nanometers
 
 # Simulation params
-_T = 300 # Temperature in Kelvin
-#_k_b = 1.380648e-23 # Boltzmann constant, in J/K
-_k_b = 0.01
+T = 300 # Temperature in Kelvin
+k_b = 1.380648e-23 # Boltzmann constant, in J/K
 
-_kT = _k_b * _T
+kT = k_b * T
 
-_seed = 42
-_dt = 1
+seed = 42
+dt = 1
 
-
-# Lattice parameters
 # For a spherical cell with diameter 400nm, use a lattice 
 # with side length 322.39839 (~322) to approximate the same cell volume.
-cell_size = 32.2
-
-# Particle parameters 
-# Units:
-#   mass: Da
-#   diameter: nm
+cell_size = 32.2e-9
+box_size = 322e-9 # length of any one side of simulation box
 
 # Ribosomes
 m_rib = 2700000
-diff_rib =  5e-5 # ribosome diffusion constant in nm2/s
-diam_rib = 20
-_gamma_r = _kT / diff_rib # Friction coefficient 
+diff_rib =  5e-14 # ribosome diffusion constant in nm2/s
+diam_rib = 20e-9
+gamma_r = kT / diff_rib # Friction coefficient 
 
 # Protein
 m_prot = 346000
-diff_prot = 0.01 # protein diffusion constant in nm2/s
-diam_prot = 2
-_gamma_p = _kT / diff_prot
+diff_prot = 0.01e-9 # protein diffusion constant in nm2/s
+diam_prot = 2e-9
+gamma_p = kT / diff_prot
 
 # Initialize the context
 hoomd.context.initialize("")
 
+
+"""
 # Create a lattice of 20nm cuboids, 8000 cells total
 sim_cell = hoomd.lattice.unitcell(N=2,
                                     a1=[cell_size,0,0],
@@ -55,38 +51,50 @@ sim_cell = hoomd.lattice.unitcell(N=2,
 
 hoomd.init.create_lattice(unitcell=sim_cell, n=10)
 
+"""
+
+# Create a snapshot
+random.seed(seed)
+
+num_particles = 1 
+snapshot = hoomd.data.make_snapshot(N=num_particles, 
+			box=hoomd.data.boxdim(L=box_size, dimensions=3), 
+			particle_types=['R','P'])
+for i in range(num_particles):
+	r1 = random.uniform(-box_size/2, box_size/2)
+	r2 = random.uniform(-box_size/2, box_size/2)
+	r3 = random.uniform(-box_size/2, box_size/2)
+	snapshot.particles.position[i] = [r1, r2, r3]
+	snapshot.particles.velocity[i] = [0.0, 0.0, 0.0]	
+	print("particle", i, ":",snapshot.particles.position[i])
+
+hoomd.init.read_snapshot(snapshot)
+
 # Make a list of cells
-nl = hoomd.md.nlist.cell()
+nl = hoomd.md.nlist.cell(r_buff=1e-9)
 
 # Define potential energy
-rr_cutoff = 2 * diam_rib
-rp_cutoff = 2 * diam_rib
-pp_cutoff = 2 * diam_prot
+rr_cutoff = diam_rib
+rp_cutoff = diam_rib
+pp_cutoff = diam_prot
 lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=nl)
 lj.pair_coeff.set('R','R', epsilon=1.0, sigma=1.0)
 lj.pair_coeff.set('R','P', epsilon=1.0, sigma=1.0, r_cut=rp_cutoff)
 lj.pair_coeff.set('P','P', epsilon=1.0, sigma=1.0, r_cut=pp_cutoff)
-"""
-rp_lj = hoomd.md.pair.lj(r_cut=1.5*diam_rib, nlist=nl)
-rp_lj.pair_coeff.set('R','P', epsilon=1.0, sigma=1.0)
-pp_lj = hoomd.md.pair.lj(r_cut=2*diam_prot, nlist=nl)
-pp_lj.pair_coeff.set('P','P', epsilon=1.0, sigma=1.0)
-"""
 
 # Set up the simulation
-hoomd.md.integrate.mode_standard(dt=_dt)
-
+hoomd.md.integrate.mode_standard(dt=dt)
 
 # Brownian Dynamics 
 all_parts = hoomd.group.all()
 
 # Not overdamped
-#hoomd.md.integrate.langevin(group=all_parts, kT=_kT, seed=_seed) 
+#hoomd.md.integrate.langevin(group=all_parts, kT=kT, seed=seed) 
 
 # Overdamped
-bd = hoomd.md.integrate.brownian(group=all_parts, kT=_kT, seed=_seed) 
-bd.set_gamma('R',_gamma_r)
-bd.set_gamma('P',_gamma_p)
+bd = hoomd.md.integrate.brownian(group=all_parts, kT=kT, seed=seed) 
+bd.set_gamma('R',gamma_r)
+bd.set_gamma('P',gamma_p)
 
 
 # Log stuff
