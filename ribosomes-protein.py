@@ -8,30 +8,38 @@ import random
 # All length units specified in nanometers
 
 # Simulation params
-T = 300 # Temperature in Kelvin
+T = 30 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 
 kT = k_b * T
 
 seed = 42
-dt = 1
+dt = 1e-9
 
 # For a spherical cell with diameter 400nm, use a lattice 
-# with side length 322.39839 (~322) to approximate the same cell volume.
+# with side length 322.39839nm (~322) to approximate the same cell volume.
 cell_size = 32.2e-9
 box_size = 322e-9 # length of any one side of simulation box
 
 # Ribosomes
 m_rib = 2700000
-diff_rib =  5e-14 # ribosome diffusion constant in nm2/s
+diff_rib =  5e-14 # ribosome diffusion constant
 diam_rib = 20e-9
 gamma_r = kT / diff_rib # Friction coefficient 
 
 # Protein
 m_prot = 346000
-diff_prot = 0.01e-9 # protein diffusion constant in nm2/s
+diff_prot = 10e-12 # protein diffusion constant
 diam_prot = 2e-9
 gamma_p = kT / diff_prot
+
+# Lennard-Jones potential parameters
+rr_sigma = diam_rib * 1.5
+rr_epsilon = 1e-60
+rp_sigma = diam_rib * 1.2
+rp_epsilon = 1e-60
+pp_sigma = diam_prot
+pp_epsilon = 1e-60
 
 # Initialize the context
 hoomd.context.initialize("")
@@ -56,17 +64,21 @@ hoomd.init.create_lattice(unitcell=sim_cell, n=10)
 # Create a snapshot
 random.seed(seed)
 
-num_particles = 1 
+num_particles = 60700 
 snapshot = hoomd.data.make_snapshot(N=num_particles, 
-			box=hoomd.data.boxdim(L=box_size, dimensions=3), 
-			particle_types=['R','P'])
+		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
+		particle_types=['R','P'])
 for i in range(num_particles):
-	r1 = random.uniform(-box_size/2, box_size/2)
-	r2 = random.uniform(-box_size/2, box_size/2)
-	r3 = random.uniform(-box_size/2, box_size/2)
-	snapshot.particles.position[i] = [r1, r2, r3]
-	snapshot.particles.velocity[i] = [0.0, 0.0, 0.0]	
-	print("particle", i, ":",snapshot.particles.position[i])
+    r1 = random.uniform(-box_size/2, box_size/2)
+    r2 = random.uniform(-box_size/2, box_size/2)
+    r3 = random.uniform(-box_size/2, box_size/2)
+    snapshot.particles.position[i] = [r1, r2, r3]
+    if i < 700:
+        snapshot.particles.typeid[i] = 0 
+    else:  
+        snapshot.particles.typeid[i] = 1 
+    snapshot.particles.velocity[i] = [0.0, 0.0, 0.0]	
+#    print("particle", i, ":",snapshot.particles.position[i])
 
 hoomd.init.read_snapshot(snapshot)
 
@@ -78,9 +90,9 @@ rr_cutoff = diam_rib
 rp_cutoff = diam_rib
 pp_cutoff = diam_prot
 lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=nl)
-lj.pair_coeff.set('R','R', epsilon=1.0, sigma=1.0)
-lj.pair_coeff.set('R','P', epsilon=1.0, sigma=1.0, r_cut=rp_cutoff)
-lj.pair_coeff.set('P','P', epsilon=1.0, sigma=1.0, r_cut=pp_cutoff)
+lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma)
+lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff)
+lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff)
 
 # Set up the simulation
 hoomd.md.integrate.mode_standard(dt=dt)
@@ -105,5 +117,5 @@ hoomd.analyze.log(filename="ribosome-protein-output.log",
 hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
 
 # Run the simulation
-hoomd.run(1e5)
+hoomd.run(1e3)
 
