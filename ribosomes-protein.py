@@ -4,11 +4,12 @@
 import hoomd
 import hoomd.md
 import random
+import math
 
 # All length units specified in nanometers
 
 # Simulation params
-T = 30 # Temperature in Kelvin
+T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 
 kT = k_b * T
@@ -34,12 +35,12 @@ diam_prot = 2e-9
 gamma_p = kT / diff_prot
 
 # Lennard-Jones potential parameters
-rr_sigma = diam_rib * 1.5
-rr_epsilon = 1e-60
-rp_sigma = diam_rib * 1.2
-rp_epsilon = 1e-60
-pp_sigma = diam_prot
-pp_epsilon = 1e-60
+rr_sigma = diam_rib / 2
+rr_epsilon = 1.69e-20
+rp_sigma = (diam_rib + diam_prot) / 2 
+rp_epsilon = 1.69e-20
+pp_sigma = diam_prot / 2
+pp_epsilon = 1.69e-20
 
 # Initialize the context
 hoomd.context.initialize("")
@@ -61,18 +62,47 @@ hoomd.init.create_lattice(unitcell=sim_cell, n=10)
 
 """
 
-# Create a snapshot
-random.seed(seed)
+# Utilities for setting up the simulation
 
-num_particles = 60700 
-snapshot = hoomd.data.make_snapshot(N=num_particles, 
-		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
-		particle_types=['R','P'])
-for i in range(num_particles):
+euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
+
+valid = lambda v: v > rr_sigma
+
+def rand_pos():
     r1 = random.uniform(-box_size/2, box_size/2)
     r2 = random.uniform(-box_size/2, box_size/2)
     r3 = random.uniform(-box_size/2, box_size/2)
-    snapshot.particles.position[i] = [r1, r2, r3]
+    return [r1, r2, r3]
+
+def all_valid(v):
+
+    particles = snapshot.particles.position 
+    for placed in particles:
+        if euc(placed, v) < rr_sigma:
+            return False
+    return True
+"""
+    distances = list(map(dist, particles))
+    filtered = filter(valid, distances)
+    return len(filtered) > 0
+"""
+
+# Create a snapshot
+random.seed(seed)
+num_particles = 60700 
+placed_particles = list() # keep track of particles already placed in simulation
+
+snapshot = hoomd.data.make_snapshot(N=num_particles, 
+		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
+		particle_types=['R','P'])
+
+for i in range(num_particles):
+    print "Sampling position for particle " + str(i) + "."
+    p = rand_pos()
+    while not all_valid(p):
+        p = rand_pos()
+        print "Resampling position..."
+    snapshot.particles.position[i] = p 
     if i < 700:
         snapshot.particles.typeid[i] = 0 
     else:  
@@ -119,3 +149,7 @@ hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
 # Run the simulation
 hoomd.run(1e3)
 
+
+
+vec = [1, 2, 3]
+print filtered
