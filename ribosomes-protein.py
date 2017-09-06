@@ -64,51 +64,132 @@ hoomd.init.create_lattice(unitcell=sim_cell, n=10)
 
 # Utilities for setting up the simulation
 
+class Cell:
+
+    def __init__(self):
+        self.particles = list()
+
+    def particles(self):
+        return self.particles
+
+class CellList:
+    n_split = 10
+    split = box_size / n_split 
+    
+    def __init__(self):
+        self.cells = dict() 
+        for i in range(n_split):
+            for j in range(n_split):
+                for k in range(n_split):
+                    cells[i][j][k] = Cell()
+
+    def get_neighbors(p):
+        """Get the cell that contains point p."""
+        i = p[0] / split
+        j = p[1] / split
+        k = p[2] / split
+        Cell the_cell = self.cells[i][j][k]
+
+        # won't you be my neighbor
+        neighbors = list()
+
+
+        if i != 0: 
+            neighbors.append(cells[i-1][j][k]) 
+            if j != 0:
+                neighbors.append(cells[i-1][j-1][k])
+                neighbors.append(cells[i][j-1][k]
+                if k != 0:
+                    neighbors.append(cells[i-1][j-1][k-1])
+                    neighbors.append(cells[i-1][j][k-1])
+                    neighbors.append(cells[i][j][k-1])
+                    neighbors.append(cells[i][j-1][k-1])
+                elif k != n_split-1:
+                    neighbors.append(cells[i-1][j-1][k+1])
+                    neighbors.append(cells[i-1][j][k+1])
+                    neighbors.append(cells[i][j][k+1])
+                    neighbors.append(cells[i][j-1][k+1])
+            elif j != n_split-1:
+                neighbors.append(cells[i-1][j+1][k])
+                neighbors.append(cells[i][j+1][k])
+                if k != 0:
+                    neighbors.append(cells[i-1][j+1][k-1])
+                    neighbors.append(cells[i][j+1][k-1])
+                elif k != n_split-1:
+                    neighbors.append(cells[i-1][j+1][k+1])
+                    neighbors.append(cells[i][j+1][k+1])
+
+        elif i != n_split-1:
+            neighbors.append(cells[i+1][j][k])
+            if j != n_split-1:
+                neighbors.append(cells[i+1][j+1][k])
+                if k != n_split-1:
+                    neighbors.append(cells[i+1][j+1][k+1])
+                    neighbors.append(cells[i+1][j][k+1])
+                elif k != 0:
+                    neighbors.append(cells[i+1][j+1][k-1])
+                    neighbors.append(cells[i+1][j][k-1])
+            elif j != 0:
+                neighbors.append(cells[i+1][j-1][k])
+                if k != n_split-1:
+                    neighbors.append(cells[i+1][j-1][k+1])
+                elif k != 0:
+                    neighbors.append(cells[i+1][j-1][k-1])
+
+        return the_cell
+placed_particles = list() # keep track of particles already placed in simulation
+neighbor_list = list() # n^2 is bad yo
+
 euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
 
 valid = lambda v: v > rr_sigma
 
 def rand_pos():
-    r1 = random.uniform(-box_size/2, box_size/2)
-    r2 = random.uniform(-box_size/2, box_size/2)
-    r3 = random.uniform(-box_size/2, box_size/2)
+    r1 = random.uniform(0, box_size)
+    r2 = random.uniform(0, box_size)
+    r3 = random.uniform(0, box_size)
     return [r1, r2, r3]
 
 def all_valid(v):
 
-    particles = snapshot.particles.position 
-    for placed in particles:
+    # Find cell of particle
+
+    for placed in placed_particles:
         if euc(placed, v) < rr_sigma:
             return False
     return True
-"""
-    distances = list(map(dist, particles))
-    filtered = filter(valid, distances)
-    return len(filtered) > 0
-"""
 
-# Create a snapshot
-random.seed(seed)
-num_particles = 60700 
-placed_particles = list() # keep track of particles already placed in simulation
 
-snapshot = hoomd.data.make_snapshot(N=num_particles, 
-		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
-		particle_types=['R','P'])
+
+def compute_neighbors(p):
+
 
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "."
     p = rand_pos()
     while not all_valid(p):
         p = rand_pos()
-        print "Resampling position..."
-    snapshot.particles.position[i] = p 
+    placed_particles.append(p)
+    compute_neighbors(p)
+
+
+# Create a snapshot
+random.seed(seed)
+num_particles = 60700 
+
+
+snapshot = hoomd.data.make_snapshot(N=num_particles, 
+		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
+		particle_types=['R','P'])
+
+for i in range(num_particles): 
+    snapshot.particles.position[i] = placed_particles[i] 
     if i < 700:
         snapshot.particles.typeid[i] = 0 
     else:  
         snapshot.particles.typeid[i] = 1 
     snapshot.particles.velocity[i] = [0.0, 0.0, 0.0]	
-#    print("particle", i, ":",snapshot.particles.position[i])
+
 
 hoomd.init.read_snapshot(snapshot)
 
@@ -151,5 +232,3 @@ hoomd.run(1e3)
 
 
 
-vec = [1, 2, 3]
-print filtered
