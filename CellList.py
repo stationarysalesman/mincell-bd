@@ -5,6 +5,7 @@ import hoomd
 import hoomd.md
 import random
 import math
+import sys
 
 # Utilities for setting up the simulation
 
@@ -33,9 +34,10 @@ class Cell:
 
 class CellList:
     
+    euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
+   
     def __init__(self, size=100, n_split=10):
         self.n_split = n_split
-        self.split = size / n_split
         self.cells = dict() 
         for i in range(n_split):
             self.cells[i] = dict()
@@ -43,6 +45,7 @@ class CellList:
                 self.cells[i][j] = dict()
                 for k in range(n_split):
                     self.cells[i][j][k] = Cell()
+
 
     def insert(self, particle):
         """Insert a particle into its cell."""
@@ -52,6 +55,18 @@ class CellList:
         k = int(p[2] / (box_size / self.n_split))
         the_cell = self.cells[i][j][k]
         the_cell.particles.append(particle)
+
+
+    def dump(self):
+        """Dump all particles into a list. Useful, probably"""
+        master_list = list()
+        for cx in self.cells:
+            for cy in self.cells[cx]:
+                for cz in self.cells[cx][cy]:
+                    for particle in self.cells[cx][cy][cz].particles:
+                        master_list.append(particle)
+        return master_list 
+
 
     def get_neighbors(self, particle):
         """Get the cell that holds a particle, and its neighbors."""
@@ -114,11 +129,39 @@ class CellList:
             for particle in c.particles:
                 neighbor_list.append(particle)
         return neighbor_list
+    
+    def test(self):
+        print "Performing acceptance test..."
+        master_list = self.dump()
+        N = len(master_list)
+        i = 0
+        while not len(master_list) == 0:
+            obj = master_list.pop()
+            p_pos = obj.pos
+            p_vdwr = obj.vdwr
+            sys.stdout.flush()
+            for neighbor in master_list:
+                neighbor_pos = neighbor.pos
+                neighbor_vdwr = neighbor.vdwr
+                dist = euc(p_pos, neighbor_pos)
+                if ((p_vdwr == neighbor_vdwr) and (dist < neighbor_vdwr)):
+                    print "Error (particle " + str(i) + "): acceptable distance: " + str(neighbor_vdwr) + ", actual distance: " + str(dist)
+                    return False 
+                elif (p_vdwr != neighbor_vdwr):
+                    r_avg = (p_vdwr + neighbor_vdwr)/2
+                    if dist < r_avg:
+                        print "Error (particle " + str(i) + "): acceptable distance: " + str(r_avg) + ", actual distance: " + str(dist)
+                        return False 
+
+
+                
+
+        return True 
 
 placed_particles = list() # keep track of particles already placed in simulation
 neighbor_list = list() # n^2 is bad yo
 box_size = 322e-09 
-split = 60 
+split = 10 
 
 
 clist = CellList(box_size, split)
@@ -152,7 +195,7 @@ def valid(particle):
     return True
 
 
-num_particles = 60000 
+num_particles = 6000 
 r_vdwr = 10e-9
 p_vdwr = 1e-9
 
@@ -177,5 +220,4 @@ for i in range(700):
         particle.pos = p 
     clist.insert(particle)
 
-
-
+print "Test result: " + str(clist.test())
