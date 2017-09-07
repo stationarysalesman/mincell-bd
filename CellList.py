@@ -33,12 +33,18 @@ class Cell:
 
 
 class CellList:
-    
+ 
     euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
+    in_range = lambda v: v >= 0 and v <= n_split
+    valid_idx_lst = lambda l: in_range(l[0]) and in_range(l[1]) and in_range(l[2])
+
    
     def __init__(self, size=100, n_split=10):
         self.n_split = n_split
         self.cells = dict() 
+        self.in_range = lambda v: v >= 0 and v <= n_split
+        self.valid_idx_lst = lambda l: self.in_range(l[0]) and self.in_range(l[1]) and self.in_range(l[2])
+         
         for i in range(n_split):
             self.cells[i] = dict()
             for j in range(n_split):
@@ -75,11 +81,9 @@ class CellList:
         j = int(p[1] / (box_size / self.n_split))
         k = int(p[2] / (box_size / self.n_split))
         the_cell = self.cells[i][j][k]
-         
-        # won't you be my neighbor
+        
+        # Won't you be my neighbor?
         neighbors = list()
-
-
         if i != 0: 
             neighbors.append(self.cells[i-1][j][k]) 
             if j != 0:
@@ -129,7 +133,74 @@ class CellList:
             for particle in c.particles:
                 neighbor_list.append(particle)
         return neighbor_list
+   
+    def computeNeighborCells(self, particle):
+        """Determine which cell holds a particle, and the cells 
+        holding its neighbors."""
+        p = particle.pos
+        i = int(p[0] / (box_size / self.n_split))
+        j = int(p[1] / (box_size / self.n_split))
+        k = int(p[2] / (box_size / self.n_split))
+        the_cell = self.cells[i][j][k]
+
+        # Won't you be my neighbor?
+        idx_list = list() 
+        idx_list.append((i, j, k))
+        """ 
+        if i != 0: 
+            idx_list.append((i-1,j,k)) 
+            if j != 0:
+                idx_list.append((i-1,j-1,k))
+                idx_list.append((i,j-1,k))
+                if k != 0:
+                    idx_list.append((i-1,j-1,k-1))
+                    idx_list.append((i-1,j,k-1))
+                    idx_list.append((i,j,k-1))
+                    idx_list.append((i,j-1,k-1))
+                if k != self.n_split-1:
+                    idx_list.append((i-1,j-1,k+1))
+                    idx_list.append((i-1,j,k+1))
+                    idx_list.append((i,j,k+1))
+                    idx_list.append((i,j-1,k+1))
+            if j != self.n_split-1:
+                idx_list.append((i-1,j+1,k))
+                idx_list.append((i,j+1,k))
+                if k != 0:
+                    idx_list.append((i-1,j+1,k-1))
+                    idx_list.append((i,j+1,k-1))
+                if k != self.n_split-1:
+                    idx_list.append((i-1,j+1,k+1))
+                    idx_list.append((i,j+1,k+1))
+
+        if i != self.n_split-1:
+            idx_list.append((i+1,j,k))
+            if j != self.n_split-1:
+                idx_list.append((i+1,j+1,k))
+                if k != self.n_split-1:
+                    idx_list.append((i+1,j+1,k+1))
+                    idx_list.append((i+1,j,k+1))
+                if k != 0:
+                    idx_list.append((i+1,j+1,k-1))
+                    idx_list.append((i+1,j,k-1))
+            if j != 0:
+                idx_list.append((i+1,j-1,k))
+                if k != self.n_split-1:
+                    idx_list.append((i+1,j-1,k+1))
+                if k != 0:
+                    idx_list.append((i+1,j-1,k-1))
+        """
+        for x in range(i-1, i+2):
+            for y in range(j-1, j+2):
+                for z in range(k-1, k+2):
+                    idx_list.append((x,y,z))
+        s = set(idx_list)
+        idx_list = list(s)
+        return filter(self.valid_idx_lst, idx_list)
     
+
+
+
+
     def test(self):
         print "Performing acceptance test..."
         master_list = self.dump()
@@ -139,28 +210,19 @@ class CellList:
             obj = master_list.pop()
             p_pos = obj.pos
             p_vdwr = obj.vdwr
-            sys.stdout.flush()
             for neighbor in master_list:
                 neighbor_pos = neighbor.pos
                 neighbor_vdwr = neighbor.vdwr
                 dist = euc(p_pos, neighbor_pos)
-                if ((p_vdwr == neighbor_vdwr) and (dist < neighbor_vdwr)):
-                    print "Error (particle " + str(i) + "): acceptable distance: " + str(neighbor_vdwr) + ", actual distance: " + str(dist)
+                thresh = (p_vdwr + neighbor_vdwr) / 2
+                if dist < thresh:
+                    print "Error (particle " + str(i) + "): acceptable distance: " + str(thresh) + ", actual distance: " + str(dist)
                     return False 
-                elif (p_vdwr != neighbor_vdwr):
-                    r_avg = (p_vdwr + neighbor_vdwr)/2
-                    if dist < r_avg:
-                        print "Error (particle " + str(i) + "): acceptable distance: " + str(r_avg) + ", actual distance: " + str(dist)
-                        return False 
-
-
-                
-
         return True 
 
 placed_particles = list() # keep track of particles already placed in simulation
 neighbor_list = list() # n^2 is bad yo
-box_size = 322e-09 
+box_size = 100 
 split = 10 
 
 
@@ -186,12 +248,9 @@ def valid(particle):
         neighbor_pos = neighbor.pos
         neighbor_vdwr = neighbor.vdwr
         dist = euc(p_pos, neighbor_pos)
-        if ((p_vdwr == neighbor_vdwr) and (dist < neighbor_vdwr)):
+        thresh = (p_vdwr + neighbor_vdwr) / 2
+        if dist < thresh:
             return False
-        else:
-            r_avg = (p_vdwr + neighbor_vdwr)/2
-            if dist < r_avg:
-                return False
     return True
 
 
@@ -199,6 +258,23 @@ num_particles = 6000
 r_vdwr = 10e-9
 p_vdwr = 1e-9
 
+p = Particle(1, [0,0,0])
+lst = clist.computeNeighborCells(p)
+print lst
+print "len is: " + str(len(lst))
+"""
+# Place the ribosomes
+for i in range(700):
+    print "Sampling position for ribosome " + str(i) + "."
+    p = rand_pos()
+    particle = Particle(r_vdwr, p) 
+    while not valid(particle):
+        print "Resampling..."
+        p = rand_pos()
+        particle.pos = p 
+    clist.insert(particle)
+"""
+"""
 # Place the proteins
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "." 
@@ -209,15 +285,5 @@ for i in range(num_particles):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
-
-for i in range(700):
-    print "Sampling position for ribosome " + str(i) + "."
-    p = rand_pos()
-    particle = Particle(r_vdwr, p) 
-    while not valid(particle):
-        print "Resampling..."
-        p = rand_pos()
-        particle.pos = p 
-    clist.insert(particle)
-
+"""
 print "Test result: " + str(clist.test())
