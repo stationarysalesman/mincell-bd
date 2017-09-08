@@ -5,6 +5,8 @@ import hoomd
 import hoomd.md
 import random
 import math
+import string
+import numpy
 
 # All length units specified in nanometers
 
@@ -34,14 +36,6 @@ diff_prot = 10e-12 # protein diffusion constant
 diam_prot = 2e-9
 gamma_p = kT / diff_prot
 
-# Lennard-Jones potential parameters
-rr_sigma = diam_rib / 2
-rr_epsilon = 1.69e-20
-rp_sigma = (diam_rib + diam_prot) / 2 
-rp_epsilon = 1.69e-20
-pp_sigma = diam_prot / 2
-pp_epsilon = 1.69e-20
-
 # Initialize the context
 hoomd.context.initialize("")
 
@@ -62,148 +56,71 @@ hoomd.init.create_lattice(unitcell=sim_cell, n=10)
 
 """
 
-# Utilities for setting up the simulation
+# Read in a particle configuration
+particles = list()
+with open('particle_config.txt', 'r') as infile:
+    for line in infile:
+        items = string.split(line, ',') 
+        species, vdwr, x, y, z = items 
+        pos = [float(x), float(y), float(z)]
+        particles.append([species, vdwr, pos])
 
-class Cell:
-
-    def __init__(self):
-        self.particles = list()
-
-    def particles(self):
-        return self.particles
-
-class CellList:
-    n_split = 10
-    split = box_size / n_split 
-    
-    def __init__(self):
-        self.cells = dict() 
-        for i in range(n_split):
-            for j in range(n_split):
-                for k in range(n_split):
-                    cells[i][j][k] = Cell()
-
-    def get_neighbors(p):
-        """Get the cell that contains point p."""
-        i = p[0] / split
-        j = p[1] / split
-        k = p[2] / split
-        Cell the_cell = self.cells[i][j][k]
-
-        # won't you be my neighbor
-        neighbors = list()
-
-
-        if i != 0: 
-            neighbors.append(cells[i-1][j][k]) 
-            if j != 0:
-                neighbors.append(cells[i-1][j-1][k])
-                neighbors.append(cells[i][j-1][k]
-                if k != 0:
-                    neighbors.append(cells[i-1][j-1][k-1])
-                    neighbors.append(cells[i-1][j][k-1])
-                    neighbors.append(cells[i][j][k-1])
-                    neighbors.append(cells[i][j-1][k-1])
-                elif k != n_split-1:
-                    neighbors.append(cells[i-1][j-1][k+1])
-                    neighbors.append(cells[i-1][j][k+1])
-                    neighbors.append(cells[i][j][k+1])
-                    neighbors.append(cells[i][j-1][k+1])
-            elif j != n_split-1:
-                neighbors.append(cells[i-1][j+1][k])
-                neighbors.append(cells[i][j+1][k])
-                if k != 0:
-                    neighbors.append(cells[i-1][j+1][k-1])
-                    neighbors.append(cells[i][j+1][k-1])
-                elif k != n_split-1:
-                    neighbors.append(cells[i-1][j+1][k+1])
-                    neighbors.append(cells[i][j+1][k+1])
-
-        elif i != n_split-1:
-            neighbors.append(cells[i+1][j][k])
-            if j != n_split-1:
-                neighbors.append(cells[i+1][j+1][k])
-                if k != n_split-1:
-                    neighbors.append(cells[i+1][j+1][k+1])
-                    neighbors.append(cells[i+1][j][k+1])
-                elif k != 0:
-                    neighbors.append(cells[i+1][j+1][k-1])
-                    neighbors.append(cells[i+1][j][k-1])
-            elif j != 0:
-                neighbors.append(cells[i+1][j-1][k])
-                if k != n_split-1:
-                    neighbors.append(cells[i+1][j-1][k+1])
-                elif k != 0:
-                    neighbors.append(cells[i+1][j-1][k-1])
-
-        return the_cell
-placed_particles = list() # keep track of particles already placed in simulation
-neighbor_list = list() # n^2 is bad yo
-
-euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
-
-valid = lambda v: v > rr_sigma
-
-def rand_pos():
-    r1 = random.uniform(0, box_size)
-    r2 = random.uniform(0, box_size)
-    r3 = random.uniform(0, box_size)
-    return [r1, r2, r3]
-
-def all_valid(v):
-
-    # Find cell of particle
-
-    for placed in placed_particles:
-        if euc(placed, v) < rr_sigma:
-            return False
-    return True
-
-
-
-def compute_neighbors(p):
-
-
-for i in range(num_particles):
-    print "Sampling position for particle " + str(i) + "."
-    p = rand_pos()
-    while not all_valid(p):
-        p = rand_pos()
-    placed_particles.append(p)
-    compute_neighbors(p)
-
+# Data dumping
+class avg_vel:
+    def __init__(self, system):
+        self.system = system
+    def __call__(self, timestep):
+        snap = self.system.take_snapshot();
+        avg_vel = numpy.mean(snap.particles.velocity, axis=0);
+        print(timestep, ':', avg_vel);
 
 # Create a snapshot
-random.seed(seed)
-num_particles = 60700 
-
+num_particles = len(particles)
 
 snapshot = hoomd.data.make_snapshot(N=num_particles, 
 		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
 		particle_types=['R','P'])
-
-for i in range(num_particles): 
-    snapshot.particles.position[i] = placed_particles[i] 
-    if i < 700:
-        snapshot.particles.typeid[i] = 0 
-    else:  
-        snapshot.particles.typeid[i] = 1 
-    snapshot.particles.velocity[i] = [0.0, 0.0, 0.0]	
-
-
-hoomd.init.read_snapshot(snapshot)
+for i in range(num_particles):
+    if (particles[i][0] == 'R'):
+        snapshot.particles.typeid[i] = 0
+    else:
+        snapshot.particles.typeid[i] = 1
+    snapshot.particles.position[i] = particles[i][2] 
+system = hoomd.init.read_snapshot(snapshot)
 
 # Make a list of cells
 nl = hoomd.md.nlist.cell(r_buff=1e-9)
 
-# Define potential energy
-rr_cutoff = diam_rib
-rp_cutoff = diam_rib
-pp_cutoff = diam_prot
+# Lennard-Jones potential parameters
+rr_sigma = diam_rib/2 
+rr_epsilon = 1.69e-20
+rp_sigma = (diam_rib/2 + diam_prot/2)/2
+rp_epsilon = 1.69e-20
+pp_sigma = diam_prot/2
+pp_epsilon = 1.69e-20
+rr_cutoff = diam_rib*5
+rp_cutoff = diam_rib*5
+pp_cutoff = diam_prot*5
 lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=nl)
 lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma)
 lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff)
 lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff)
+
+# Wall potentials
+"""
+wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
+wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
+wall_negX = hoomd.md.wall.plane(origin=(-box_size/2, 0, 0), normal=(1.0, 0, 0), inside=True)
+wall_posX = hoomd.md.wall.plane(origin=(box_size/2, 0, 0), normal=(-1.0, 0, 0), inside=True)
+wall_negY = hoomd.md.wall.plane(origin=(0, -box_size/2, 0), normal=(0, 1.0, 0), inside=True)
+wall_posY = hoomd.md.wall.plane(origin=(0, box_size/2, 0), normal=(0, -1.0, 0), inside=True)
+wall_lst = [wall_bottom, wall_top, wall_negX, wall_negY, wall_posX, wall_posY]
+all_walls = hoomd.md.wall.group(wall_lst)
+wlj = hoomd.md.wall.lj(all_walls, r_cut=1e-9)
+wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon)
+wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon)
+wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon)
+"""
 
 # Set up the simulation
 hoomd.md.integrate.mode_standard(dt=dt)
@@ -222,9 +139,11 @@ bd.set_gamma('P',gamma_p)
 
 # Log stuff
 hoomd.analyze.log(filename="ribosome-protein-output.log",
-                    quantities=['potential_energy', 'temperature'],
-                    period=100,
+                    quantities=['potential_energy', 'temperature', 'kinetic_energy', 'momentum'],
+                    period=1,
                     overwrite=True)
+#hoomd.analyze.callback(callback=avg_vel(system), period=1)
+
 hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
 
 # Run the simulation

@@ -6,13 +6,13 @@ import hoomd.md
 import random
 import math
 import sys
-
 # Utilities for setting up the simulation
 
 class Particle:
     """Store properties needed to place particles"""
 
-    def __init__(self, vdwr, pos = [0.0, 0.0, 0.0]):
+    def __init__(self, species, vdwr, pos = [0.0, 0.0, 0.0]):
+        self.species = species 
         self.vdwr = vdwr
         self.pos = pos
 
@@ -73,6 +73,23 @@ class CellList:
                         master_list.append(particle)
         return master_list 
 
+
+    def translate(self, origin):
+        """Translate all particles to a new origin."""
+        master_list = self.dump()
+        for particle in master_list:
+            particle.pos[0] += origin[0]
+            particle.pos[1] += origin[1]
+            particle.pos[2] += origin[2]
+        return
+
+
+    def export(self):
+        """Export particle configuration to a file."""
+        master_list = self.dump()
+        with open('particle_config.txt', 'w') as of:
+            for particle in master_list:
+                of.write(particle.species + ',' + str(particle.vdwr) + ',' + str(particle.pos[0]) + ',' + str(particle.pos[1]) + ',' + str(particle.pos[2]) + '\n')
 
     def generateIndices(self, i, j, k):
         """Generate valid neighbor cell indices for cell (i, j, k)."""
@@ -135,14 +152,12 @@ class CellList:
         sys.stdout.write('\n')
         return True 
 
-placed_particles = list() # keep track of particles already placed in simulation
-neighbor_list = list() # n^2 is bad yo
+
 box_size = 322e-9 
 split = 10 
 
 
 clist = CellList(box_size, split)
-rr_sigma = 10e-9 
 
 euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
 
@@ -164,7 +179,7 @@ def valid(particle):
         neighbor_vdwr = neighbor.vdwr
         dist = euc(p_pos, neighbor_pos)
         thresh = (p_vdwr + neighbor_vdwr) / 2
-        if dist < thresh:
+        if dist <= thresh:
             return False
     return True
 
@@ -186,7 +201,7 @@ print "len is: " + str(len(lst))
 for i in range(700):
     print "Sampling position for ribosome " + str(i) + "."
     p = rand_pos()
-    particle = Particle(r_vdwr, p) 
+    particle = Particle('R', r_vdwr, p) 
     while not valid(particle):
         print "Resampling..."
         p = rand_pos()
@@ -198,12 +213,16 @@ for i in range(700):
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "." 
     p = rand_pos()
-    particle = Particle(p_vdwr, p) 
+    particle = Particle('P', p_vdwr, p) 
     while not valid(particle):
         print "Resampling..."
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
+
+origin = [-box_size/2, -box_size/2, -box_size/2]
+clist.translate(origin)
+clist.export()
 
 # Acceptance test (slow: O(n^2))
 #print "Test result: " + str(clist.test())
