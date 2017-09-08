@@ -42,7 +42,7 @@ class CellList:
     def __init__(self, size=100, n_split=10):
         self.n_split = n_split
         self.cells = dict() 
-        self.in_range = lambda v: v >= 0 and v <= n_split
+        self.in_range = lambda v: v >= 0 and v < n_split
         self.valid_idx_lst = lambda l: self.in_range(l[0]) and self.in_range(l[1]) and self.in_range(l[2])
          
         for i in range(n_split):
@@ -74,66 +74,34 @@ class CellList:
         return master_list 
 
 
-    def get_neighbors(self, particle):
-        """Get the cell that holds a particle, and its neighbors."""
+    def generateIndices(self, i, j, k):
+        """Generate valid neighbor cell indices for cell (i, j, k)."""
+        idx_lst = list()
+        for x in range(i-1, i+2):
+            for y in range(j-1, j+2):
+                for z in range(k-1, k+2):
+                    idx_lst.append((x,y,z))
+        s = set(idx_lst)
+        idx_lst = list(s)
+
+        return filter(self.valid_idx_lst, idx_lst)
+   
+
+    def getNeighbors(self, particle):
+        """Compute a given particle's neighbor list."""
         p = particle.pos
         i = int(p[0] / (box_size / self.n_split))
         j = int(p[1] / (box_size / self.n_split))
         k = int(p[2] / (box_size / self.n_split))
-        the_cell = self.cells[i][j][k]
-        
-        # Won't you be my neighbor?
-        neighbors = list()
-        if i != 0: 
-            neighbors.append(self.cells[i-1][j][k]) 
-            if j != 0:
-                neighbors.append(self.cells[i-1][j-1][k])
-                neighbors.append(self.cells[i][j-1][k])
-                if k != 0:
-                    neighbors.append(self.cells[i-1][j-1][k-1])
-                    neighbors.append(self.cells[i-1][j][k-1])
-                    neighbors.append(self.cells[i][j][k-1])
-                    neighbors.append(self.cells[i][j-1][k-1])
-                if k != self.n_split-1:
-                    neighbors.append(self.cells[i-1][j-1][k+1])
-                    neighbors.append(self.cells[i-1][j][k+1])
-                    neighbors.append(self.cells[i][j][k+1])
-                    neighbors.append(self.cells[i][j-1][k+1])
-            if j != self.n_split-1:
-                neighbors.append(self.cells[i-1][j+1][k])
-                neighbors.append(self.cells[i][j+1][k])
-                if k != 0:
-                    neighbors.append(self.cells[i-1][j+1][k-1])
-                    neighbors.append(self.cells[i][j+1][k-1])
-                if k != self.n_split-1:
-                    neighbors.append(self.cells[i-1][j+1][k+1])
-                    neighbors.append(self.cells[i][j+1][k+1])
+        idx_lst = self.generateIndices(i, j, k)
+        neighbor_lst = list()
+        for tup in idx_lst:
+            x, y, z = tup
+            for particle in self.cells[x][y][z].particles:
+                neighbor_lst.append(particle)
+        return neighbor_lst
 
-        if i != self.n_split-1:
-            neighbors.append(self.cells[i+1][j][k])
-            if j != self.n_split-1:
-                neighbors.append(self.cells[i+1][j+1][k])
-                if k != self.n_split-1:
-                    neighbors.append(self.cells[i+1][j+1][k+1])
-                    neighbors.append(self.cells[i+1][j][k+1])
-                if k != 0:
-                    neighbors.append(self.cells[i+1][j+1][k-1])
-                    neighbors.append(self.cells[i+1][j][k-1])
-            if j != 0:
-                neighbors.append(self.cells[i+1][j-1][k])
-                if k != self.n_split-1:
-                    neighbors.append(self.cells[i+1][j-1][k+1])
-                if k != 0:
-                    neighbors.append(self.cells[i+1][j-1][k-1])
 
-        neighbor_list = list()
-        for particle in the_cell.particles:
-            neighbor_list.append(particle)
-        for c in neighbors:
-            for particle in c.particles:
-                neighbor_list.append(particle)
-        return neighbor_list
-   
     def computeNeighborCells(self, particle):
         """Determine which cell holds a particle, and the cells 
         holding its neighbors."""
@@ -141,64 +109,7 @@ class CellList:
         i = int(p[0] / (box_size / self.n_split))
         j = int(p[1] / (box_size / self.n_split))
         k = int(p[2] / (box_size / self.n_split))
-        the_cell = self.cells[i][j][k]
-
-        # Won't you be my neighbor?
-        idx_list = list() 
-        idx_list.append((i, j, k))
-        """ 
-        if i != 0: 
-            idx_list.append((i-1,j,k)) 
-            if j != 0:
-                idx_list.append((i-1,j-1,k))
-                idx_list.append((i,j-1,k))
-                if k != 0:
-                    idx_list.append((i-1,j-1,k-1))
-                    idx_list.append((i-1,j,k-1))
-                    idx_list.append((i,j,k-1))
-                    idx_list.append((i,j-1,k-1))
-                if k != self.n_split-1:
-                    idx_list.append((i-1,j-1,k+1))
-                    idx_list.append((i-1,j,k+1))
-                    idx_list.append((i,j,k+1))
-                    idx_list.append((i,j-1,k+1))
-            if j != self.n_split-1:
-                idx_list.append((i-1,j+1,k))
-                idx_list.append((i,j+1,k))
-                if k != 0:
-                    idx_list.append((i-1,j+1,k-1))
-                    idx_list.append((i,j+1,k-1))
-                if k != self.n_split-1:
-                    idx_list.append((i-1,j+1,k+1))
-                    idx_list.append((i,j+1,k+1))
-
-        if i != self.n_split-1:
-            idx_list.append((i+1,j,k))
-            if j != self.n_split-1:
-                idx_list.append((i+1,j+1,k))
-                if k != self.n_split-1:
-                    idx_list.append((i+1,j+1,k+1))
-                    idx_list.append((i+1,j,k+1))
-                if k != 0:
-                    idx_list.append((i+1,j+1,k-1))
-                    idx_list.append((i+1,j,k-1))
-            if j != 0:
-                idx_list.append((i+1,j-1,k))
-                if k != self.n_split-1:
-                    idx_list.append((i+1,j-1,k+1))
-                if k != 0:
-                    idx_list.append((i+1,j-1,k-1))
-        """
-        for x in range(i-1, i+2):
-            for y in range(j-1, j+2):
-                for z in range(k-1, k+2):
-                    idx_list.append((x,y,z))
-        s = set(idx_list)
-        idx_list = list(s)
-        return filter(self.valid_idx_lst, idx_list)
-    
-
-
+        return self.generateIndices(i, j, k)
 
 
     def test(self):
@@ -207,6 +118,8 @@ class CellList:
         N = len(master_list)
         i = 0
         while not len(master_list) == 0:
+            sys.stdout.write('\rProgress: {:.0%}'.format((i * 1.0) / N) )
+            sys.stdout.flush()
             obj = master_list.pop()
             p_pos = obj.pos
             p_vdwr = obj.vdwr
@@ -218,11 +131,13 @@ class CellList:
                 if dist < thresh:
                     print "Error (particle " + str(i) + "): acceptable distance: " + str(thresh) + ", actual distance: " + str(dist)
                     return False 
+            i += 1
+        sys.stdout.write('\n')
         return True 
 
 placed_particles = list() # keep track of particles already placed in simulation
 neighbor_list = list() # n^2 is bad yo
-box_size = 100 
+box_size = 322e-9 
 split = 10 
 
 
@@ -243,7 +158,7 @@ def valid(particle):
     # Find cell of particle
     p_pos = particle.pos
     p_vdwr = particle.vdwr
-    nl = clist.get_neighbors(particle)
+    nl = clist.getNeighbors(particle)
     for neighbor in nl:
         neighbor_pos = neighbor.pos
         neighbor_vdwr = neighbor.vdwr
@@ -254,15 +169,19 @@ def valid(particle):
     return True
 
 
-num_particles = 6000 
+num_particles = 60000 
 r_vdwr = 10e-9
 p_vdwr = 1e-9
 
-p = Particle(1, [0,0,0])
+# Tests
+"""
+p = Particle(1, [12,0,0])
 lst = clist.computeNeighborCells(p)
 print lst
 print "len is: " + str(len(lst))
 """
+
+
 # Place the ribosomes
 for i in range(700):
     print "Sampling position for ribosome " + str(i) + "."
@@ -273,8 +192,8 @@ for i in range(700):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
-"""
-"""
+
+
 # Place the proteins
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "." 
@@ -285,5 +204,6 @@ for i in range(num_particles):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
-"""
-print "Test result: " + str(clist.test())
+
+# Acceptance test (slow: O(n^2))
+#print "Test result: " + str(clist.test())
