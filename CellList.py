@@ -56,9 +56,9 @@ class CellList:
     def insert(self, particle):
         """Insert a particle into its cell."""
         p = particle.pos
-        i = int(p[0] / (box_size / self.n_split))
-        j = int(p[1] / (box_size / self.n_split))
-        k = int(p[2] / (box_size / self.n_split))
+        i = int(p[0] / (float(box_size) / self.n_split))
+        j = int(p[1] / (float(box_size) / self.n_split))
+        k = int(p[2] / (float(box_size) / self.n_split))
         the_cell = self.cells[i][j][k]
         the_cell.particles.append(particle)
 
@@ -107,9 +107,9 @@ class CellList:
     def getNeighbors(self, particle):
         """Compute a given particle's neighbor list."""
         p = particle.pos
-        i = int(p[0] / (box_size / self.n_split))
-        j = int(p[1] / (box_size / self.n_split))
-        k = int(p[2] / (box_size / self.n_split))
+        i = int(p[0] / (float(box_size) / self.n_split))
+        j = int(p[1] / (float(box_size) / self.n_split))
+        k = int(p[2] / (float(box_size) / self.n_split))
         idx_lst = self.generateIndices(i, j, k)
         neighbor_lst = list()
         for tup in idx_lst:
@@ -123,9 +123,9 @@ class CellList:
         """Determine which cell holds a particle, and the cells 
         holding its neighbors."""
         p = particle.pos
-        i = int(p[0] / (box_size / self.n_split))
-        j = int(p[1] / (box_size / self.n_split))
-        k = int(p[2] / (box_size / self.n_split))
+        i = int(p[0] / (float(box_size) / self.n_split))
+        j = int(p[1] / (float(box_size) / self.n_split))
+        k = int(p[2] / (float(box_size) / self.n_split))
         return self.generateIndices(i, j, k)
 
 
@@ -155,6 +155,10 @@ class CellList:
 
 box_size = 322e-9 
 split = 10 
+num_particles = 6000 
+r_vdwr = 10e-9
+p_vdwr = 1e-9
+
 
 
 clist = CellList(box_size, split)
@@ -182,11 +186,6 @@ def valid(particle):
         if dist <= thresh:
             return False
     return True
-
-
-num_particles = 60000 
-r_vdwr = 10e-9
-p_vdwr = 1e-9
 
 # Tests
 """
