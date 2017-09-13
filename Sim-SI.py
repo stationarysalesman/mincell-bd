@@ -7,6 +7,9 @@ import random
 import math
 import string
 import numpy
+import time  # is there a real life analog for this import statement?
+import datetime
+import re
 
 # All length units specified in nanometers
 
@@ -15,7 +18,7 @@ T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
-dt = 1e-9
+dt = 1e-12
 
 # For a spherical cell with diameter 400nm, use a lattice 
 # with side length 322.39839nm (~322) to approximate the same cell volume.
@@ -125,31 +128,89 @@ hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
 
 
 sd = lambda v1, v2: numpy.array([(v1[0]-v2[0])**2, (v1[1]-v2[1])**2, (v1[2]-v2[2])**2])
-initial_pos = list() # calc MSD
+initial_pos_rib = list() 
+initial_pos_prot = list()
 for i in system.particles:
-    initial_pos.append(i.position) 
+    if i.typeid == 0:
+        initial_pos_rib.append(i.position) 
+    else:
+        initial_pos_prot.append(i.position) 
+
 
 # Run the simulation
-sim_t = 1e6
-hoomd.run(sim_t)
+sim_t = 1
 
-final_pos = list()
+t0 = time.clock()
+hoomd.run(sim_t)
+tf = time.clock()
+elapsed = tf - t0
+
+final_pos_rib = list()
+final_pos_prot = list()
 for i in system.particles:
-    final_pos.append(i.position)
+    if i.typeid == 0:
+        final_pos_rib.append(i.position)
+    else:
+        final_pos_prot.append(i.position)
 
 # Simulated/experimental MSD
-the_sum = numpy.array([0.0, 0.0, 0.0]) 
-for v1, v2 in zip(initial_pos, final_pos):
-    the_sum += sd(v2, v1)
+rib_sum = numpy.array([0.0, 0.0, 0.0]) 
+for v1, v2 in zip(initial_pos_rib, final_pos_rib):
+    rib_sum += sd(v2, v1)
 
-msd = the_sum / len(initial_pos) 
+if len(initial_pos_rib) != 0:
+    rib_msd = rib_sum / len(initial_pos_rib) 
+else:
+    rib_msd = 0.0
 
-len_msd = math.sqrt(msd[0]**2 + msd[1]**2 + msd[2]**2)
+rib_msd_scalar = math.sqrt(rib_msd[0]**2 + rib_msd[1]**2 + rib_msd[2]**2)
+
+prot_sum = numpy.array([0.0, 0.0, 0.0]) 
+for v1, v2 in zip(initial_pos_prot, final_pos_prot):
+    prot_sum += sd(v2, v1)
+
+if len(initial_pos_prot) != 0:
+    prot_msd = prot_sum / len(initial_pos_prot) 
+else:
+    prot_msd = 0.0
+
+prot_msd_scalar = math.sqrt(prot_msd[0]**2 + prot_msd[1]**2 + prot_msd[2]**2)
+
 
 # Modeled MSD (via Brownian motion equations)
 # Note: should be different depending on whether we simulated
 # for shorter/longer than relaxation time
-model_msd = 6 * diff_rib * (sim_t * dt)
+rib_model_msd = 6 * diff_rib * (sim_t * dt)
+prot_model_msd = 6 * diff_prot * (sim_t * dt)
 
-print "MSD: " + str(len_msd)
-print "(should be: " + str(model_msd) + ")" 
+
+# Log 
+fname = 'sim-'+str(datetime.datetime.now())+'.log'
+fname = re.sub(r" ", "", fname)
+with open(fname, 'w') as logfile:
+    logfile.write('SIMULATION PARAMETERS\n\n')
+    logfile.write('Simulation volume: ' + str((box_size)**3) + '\n')
+    logfile.write('Number of particles: ' + str(num_particles) + '\n')
+    logfile.write('Temperature: ' + str(T) + '\n')
+    logfile.write('Seed: ' + str(seed) + '\n')
+    logfile.write('dt: ' + str(dt) + '\n')
+    logfile.write('Timesteps taken: ' + str(sim_t) + '\n')
+    logfile.write('Total simulation time: ' + str(sim_t * dt) + '\n')
+    logfile.write('Total wall clock time: ' + str(tf-t0) + '\n')
+    logfile.write('Ribosome vibrational coefficient: ' + str(diff_rib) + '\n')
+    logfile.write('Ribosome diameter: ' + str(diam_rib) + '\n')
+    logfile.write('Protein vibrational coefficient: ' + str(diff_prot) + '\n')
+    logfile.write('Protein diameter: ' + str(diam_rib) + '\n')
+    logfile.write('LJ epsilon for RR interaction: ' + str(rr_epsilon) + '\n')
+    logfile.write('LJ sigma for RR interaction: ' + str(rr_sigma) + '\n')
+    logfile.write('LJ epsilon for RP interaction: ' + str(rp_epsilon) + '\n')
+    logfile.write('LJ sigma for RP interaction: ' + str(rp_sigma) + '\n')
+    logfile.write('LJ epsilon for PP interaction: ' + str(pp_epsilon) + '\n')
+    logfile.write('LJ sigma for PP interaction: ' + str(pp_sigma) + '\n')
+    logfile.write('\n\n')
+    logfile.write('RESULTS\n\n')
+    logfile.write("Ribosome MSD: " + str(rib_msd_scalar) + '\n')
+    logfile.write("Model prediction of ribosome MSD: " + str(rib_model_msd) + '\n') 
+    logfile.write("Protein MSD: " + str(rib_msd_scalar) + '\n')
+    logfile.write("Model prediction of ribosome MSD: " + str(rib_model_msd) + '\n') 
+
