@@ -109,6 +109,22 @@ lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, alpha=0)
 lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff, alpha=0)
 lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff, alpha=0)
 
+"""
+# Wall potentials
+wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
+wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
+wall_negX = hoomd.md.wall.plane(origin=(-box_size/2, 0, 0), normal=(1.0, 0, 0), inside=True)
+wall_posX = hoomd.md.wall.plane(origin=(box_size/2, 0, 0), normal=(-1.0, 0, 0), inside=True)
+wall_negY = hoomd.md.wall.plane(origin=(0, -box_size/2, 0), normal=(0, 1.0, 0), inside=True)
+wall_posY = hoomd.md.wall.plane(origin=(0, box_size/2, 0), normal=(0, -1.0, 0), inside=True)
+wall_lst = [wall_bottom, wall_top, wall_negX, wall_negY, wall_posX, wall_posY]
+all_walls = hoomd.md.wall.group(wall_lst)
+wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*5)
+wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon)
+wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon)
+wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon)
+"""
+
 # Set up the simulation
 hoomd.md.integrate.mode_standard(dt=dt)
 all_parts = hoomd.group.all()
@@ -138,7 +154,7 @@ for i in system.particles:
 
 
 # Run the simulation
-sim_t = 1
+sim_t = 1 
 
 t0 = time.clock()
 hoomd.run(sim_t)
@@ -161,7 +177,7 @@ for v1, v2 in zip(initial_pos_rib, final_pos_rib):
 if len(initial_pos_rib) != 0:
     rib_msd = rib_sum / len(initial_pos_rib) 
 else:
-    rib_msd = 0.0
+    rib_msd = [0.0, 0.0, 0.0]
 
 rib_msd_scalar = math.sqrt(rib_msd[0]**2 + rib_msd[1]**2 + rib_msd[2]**2)
 
@@ -172,7 +188,7 @@ for v1, v2 in zip(initial_pos_prot, final_pos_prot):
 if len(initial_pos_prot) != 0:
     prot_msd = prot_sum / len(initial_pos_prot) 
 else:
-    prot_msd = 0.0
+    prot_msd = [0.0, 0.0, 0.0]
 
 prot_msd_scalar = math.sqrt(prot_msd[0]**2 + prot_msd[1]**2 + prot_msd[2]**2)
 
