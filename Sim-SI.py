@@ -41,6 +41,8 @@ hoomd.context.initialize("")
 
 # Read in a particle configuration
 particles = list()
+
+
 with open('particle_config.txt', 'r') as infile:
     for line in infile:
         items = string.split(line, ',') 
@@ -72,24 +74,30 @@ num_particles = len(particles)
 snapshot = hoomd.data.make_snapshot(N=num_particles, 
 		box=hoomd.data.boxdim(L=box_size, dimensions=3), 
 		particle_types=['R','P'])
+
 for i in range(num_particles):
     if (particles[i][0] == 'R'):
         snapshot.particles.typeid[i] = 0
+        snapshot.particles.diameter[i] = diam_rib
     else:
         snapshot.particles.typeid[i] = 1
+        snapshot.particles.diameter[i] = diam_prot
+
     snapshot.particles.position[i] = particles[i][2] 
+
 system = hoomd.init.read_snapshot(snapshot)
+system_particles = system.particles
 
 # Make a list of cells
 nl = hoomd.md.nlist.cell(r_buff=1e-9)
 
 # Lennard-Jones potential parameters
 rr_sigma = diam_rib/2 
-rr_epsilon = kT 
+rr_epsilon = 1.69e-20
 rp_sigma = (diam_rib/2 + diam_prot/2)/2
-rp_epsilon = kT 
+rp_epsilon = 1.69e-20 
 pp_sigma = diam_prot/2
-pp_epsilon = kT 
+pp_epsilon = 1.69e-20 
 rr_cutoff = diam_rib*5
 rp_cutoff = diam_rib*5
 pp_cutoff = diam_prot*5
@@ -113,10 +121,35 @@ hoomd.analyze.log(filename="ribosome-protein-output.log",
 #hoomd.analyze.callback(callback=max_vel(system), period=1)
 #hoomd.analyze.callback(callback=avg_vel(system), period=1)
 
-hoomd.dump.gsd("trajectory.gsd", period=1, group=all_parts, overwrite=True)
+hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
+
+
+sd = lambda v1, v2: numpy.array([(v1[0]-v2[0])**2, (v1[1]-v2[1])**2, (v1[2]-v2[2])**2])
+initial_pos = list() # calc MSD
+for i in system.particles:
+    initial_pos.append(i.position) 
 
 # Run the simulation
-hoomd.run(1e3)
+sim_t = 1e6
+hoomd.run(sim_t)
 
+final_pos = list()
+for i in system.particles:
+    final_pos.append(i.position)
 
+# Simulated/experimental MSD
+the_sum = numpy.array([0.0, 0.0, 0.0]) 
+for v1, v2 in zip(initial_pos, final_pos):
+    the_sum += sd(v2, v1)
 
+msd = the_sum / len(initial_pos) 
+
+len_msd = math.sqrt(msd[0]**2 + msd[1]**2 + msd[2]**2)
+
+# Modeled MSD (via Brownian motion equations)
+# Note: should be different depending on whether we simulated
+# for shorter/longer than relaxation time
+model_msd = 6 * diff_rib * (sim_t * dt)
+
+print "MSD: " + str(len_msd)
+print "(should be: " + str(model_msd) + ")" 

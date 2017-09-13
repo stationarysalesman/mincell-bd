@@ -197,7 +197,7 @@ print "len is: " + str(len(lst))
 
 
 # Place the ribosomes
-for i in range(700):
+for i in range(600):
     print "Sampling position for ribosome " + str(i) + "."
     p = rand_pos()
     particle = Particle('R', r_vdwr, p) 
@@ -207,7 +207,7 @@ for i in range(700):
         particle.pos = p 
     clist.insert(particle)
 
-
+"""
 # Place the proteins
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "." 
@@ -218,7 +218,7 @@ for i in range(num_particles):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
-
+"""
 origin = [-box_size/2, -box_size/2, -box_size/2]
 clist.translate(origin)
 clist.export()
