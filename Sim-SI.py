@@ -19,7 +19,7 @@ T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
-dt = 1e-15
+dt = 1e-12
 
 # For a spherical cell with diameter 400nm, use a lattice 
 # with side length 322.39839nm (~322) to approximate the same cell volume.
@@ -112,7 +112,6 @@ lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff, 
 
 
 # Wall potentials
-
 wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
 wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
 wall_negX = hoomd.md.wall.plane(origin=(-box_size/2, 0, 0), normal=(1.0, 0, 0), inside=True)
@@ -156,19 +155,30 @@ for i in system.particles:
 
 
 # Run the simulation
-sim_t = 1e3
+sim_t = 1e6
 
 t0 = time.clock()
 
-prev_positions = [i.position for i in system.particles]
+
+
+# Debugging/analysis code
 """
+prev_positions = [i.position for i in system.particles]
 pos = np.array(prev_positions)
 ddr = np.sum((pos[None,:,:] - pos[None,:,:].transpose(1,0,2))**2, axis=2)
 print(np.sqrt(np.min(ddr[np.tril_indices_from(ddr,-1)])))
 exit()
 max_dxs = np.max(np.linalg.norm(np.abs(np.diff((new_positions, prev_positions), axis=0)), axis=2))
-"""
+
 max_dxs = 0.0
+
+a = np.array(prev_positions)
+min_pos = np.min(a, axis=0)
+max_pos = np.max(a, axis=0)
+print "min: " + str(min_pos)
+print "max: " + str(max_pos)
+
+
 for i in range(int(sim_t)):
     if not i % 100:
         print "Step " + str(i) + "..."
@@ -178,10 +188,15 @@ for i in range(int(sim_t)):
         print "max displacement: " + str(max_dxs) 
         sys.exit(1)
     new_positions = [i.position for i in system.particles]
-    max_dxs = np.max(np.linalg.norm(np.abs(np.diff((new_positions, prev_positions), axis=0)), axis=2))
-    sys.stdout.write('\rmax_dxs: {:e}'.format(max_dxs))
+#    max_dxs = np.max(np.linalg.norm(np.abs(np.diff((new_positions, prev_positions), axis=0)), axis=2))
+#    sys.stdout.write('\rmax_dxs: {:e}'.format(max_dxs))
 #    sys.stdout.flush()
 #    prev_positions = new_positions
+"""
+
+# "Production"
+hoomd.run(sim_t)
+
 
 tf = time.clock()
 elapsed = tf - t0

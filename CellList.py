@@ -155,7 +155,7 @@ class CellList:
 
 box_size = 322e-9 
 split = 10 
-num_particles = 6000 
+num_particles = 60000 
 r_vdwr = 10e-9
 p_vdwr = 1e-9
 
@@ -198,7 +198,7 @@ def valid(particle):
 
     for p in wall_points:
         dist = euc(p_pos, p)
-        if dist <= p_vdwr:
+        if dist <= 5*p_vdwr:
             return False
 
 
