@@ -6,10 +6,11 @@ import hoomd.md
 import random
 import math
 import string
-import numpy
+import numpy as np
 import time  # is there a real life analog for this import statement?
 import datetime
 import re
+import sys
 
 # All length units specified in nanometers
 
@@ -18,7 +19,7 @@ T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
-dt = 1e-12
+dt = 1e-16
 
 # For a spherical cell with diameter 400nm, use a lattice 
 # with side length 322.39839nm (~322) to approximate the same cell volume.
@@ -59,7 +60,7 @@ class avg_vel:
         self.system = system
     def __call__(self, timestep):
         snap = self.system.take_snapshot();
-        avg_vel = numpy.mean(snap.particles.velocity, axis=0);
+        avg_vel = np.mean(snap.particles.velocity, axis=0);
         print('avg',timestep, ':', avg_vel);
 
 class max_vel:
@@ -67,7 +68,7 @@ class max_vel:
         self.system = system
     def __call__(self, timestep):
         snap = self.system.take_snapshot();
-        max_vel = numpy.amax(snap.particles.velocity, axis=0);
+        max_vel = np.amax(snap.particles.velocity, axis=0);
         print('max',timestep, ':', max_vel);
 
 
@@ -109,7 +110,7 @@ lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, alpha=0)
 lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff, alpha=0)
 lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff, alpha=0)
 
-"""
+
 # Wall potentials
 wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
 wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
@@ -123,7 +124,7 @@ wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*5)
 wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon)
 wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon)
 wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon)
-"""
+
 
 # Set up the simulation
 hoomd.md.integrate.mode_standard(dt=dt)
@@ -143,7 +144,7 @@ hoomd.analyze.log(filename="ribosome-protein-output.log",
 hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
 
 
-sd = lambda v1, v2: numpy.array([(v1[0]-v2[0])**2, (v1[1]-v2[1])**2, (v1[2]-v2[2])**2])
+sd = lambda v1, v2: np.array([(v1[0]-v2[0])**2, (v1[1]-v2[1])**2, (v1[2]-v2[2])**2])
 initial_pos_rib = list() 
 initial_pos_prot = list()
 for i in system.particles:
@@ -154,10 +155,26 @@ for i in system.particles:
 
 
 # Run the simulation
-sim_t = 1 
+sim_t = 1e5
 
 t0 = time.clock()
-hoomd.run(sim_t)
+
+prev_positions = [i.position for i in system.particles]
+max_dxs = 0.0
+for i in range(int(sim_t)):
+    if not i % 100:
+        print "Step " + str(i) + "..."
+    try:
+        hoomd.run(tsteps=1, quiet=True)
+    except RuntimeError:
+        print "max displacement: " + str(max_dxs) 
+        sys.exit(1)
+#    new_positions = [i.position for i in system.particles]
+#    max_dxs = np.max(np.linalg.norm(np.abs(np.diff((new_positions, prev_positions), axis=0)), axis=2))
+#    sys.stdout.write('\rmax_dxs: {:e}'.format(max_dxs))
+#    sys.stdout.flush()
+#    prev_positions = new_positions
+
 tf = time.clock()
 elapsed = tf - t0
 
@@ -170,7 +187,7 @@ for i in system.particles:
         final_pos_prot.append(i.position)
 
 # Simulated/experimental MSD
-rib_sum = numpy.array([0.0, 0.0, 0.0]) 
+rib_sum = np.array([0.0, 0.0, 0.0]) 
 for v1, v2 in zip(initial_pos_rib, final_pos_rib):
     rib_sum += sd(v2, v1)
 
@@ -181,7 +198,7 @@ else:
 
 rib_msd_scalar = math.sqrt(rib_msd[0]**2 + rib_msd[1]**2 + rib_msd[2]**2)
 
-prot_sum = numpy.array([0.0, 0.0, 0.0]) 
+prot_sum = np.array([0.0, 0.0, 0.0]) 
 for v1, v2 in zip(initial_pos_prot, final_pos_prot):
     prot_sum += sd(v2, v1)
 
@@ -227,6 +244,6 @@ with open(fname, 'w') as logfile:
     logfile.write('RESULTS\n\n')
     logfile.write("Ribosome MSD: " + str(rib_msd_scalar) + '\n')
     logfile.write("Model prediction of ribosome MSD: " + str(rib_model_msd) + '\n') 
-    logfile.write("Protein MSD: " + str(rib_msd_scalar) + '\n')
-    logfile.write("Model prediction of ribosome MSD: " + str(rib_model_msd) + '\n') 
+    logfile.write("Protein MSD: " + str(prot_msd_scalar) + '\n')
+    logfile.write("Model prediction of ribosome MSD: " + str(prot_model_msd) + '\n') 
 

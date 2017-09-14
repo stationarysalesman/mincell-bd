@@ -185,6 +185,23 @@ def valid(particle):
         thresh = (p_vdwr + neighbor_vdwr) / 2
         if dist <= thresh:
             return False
+
+    # Too close to wall?
+    wall_points = list()
+    for i in range(3):
+        new_p = list(p_pos)
+        new_p[i] = 0.0 
+        wall_points.append(new_p)
+        new_p = list(p_pos)
+        new_p[i] = box_size
+        wall_points.append(new_p)
+
+    for p in wall_points:
+        dist = euc(p_pos, p)
+        if dist <= p_vdwr:
+            return False
+
+
     return True
 
 # Tests
@@ -207,7 +224,7 @@ for i in range(600):
         particle.pos = p 
     clist.insert(particle)
 
-"""
+
 # Place the proteins
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "." 
@@ -218,7 +235,7 @@ for i in range(num_particles):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
-"""
+
 origin = [-box_size/2, -box_size/2, -box_size/2]
 clist.translate(origin)
 clist.export()
