@@ -11,6 +11,7 @@ import time  # is there a real life analog for this import statement?
 import datetime
 import re
 import sys
+import os
 import tmeanalysis
 
 # All length units specified in nanometers
@@ -127,9 +128,12 @@ def run():
     bd.set_gamma('R',gamma_r)
     bd.set_gamma('P',gamma_p)
 
+    # Create log directory
     h = abs(hash((datetime.datetime.now())) + hash(seed))
-    rtraj_fname = 'rtraj' + str(h) + '.gsd'
-    ptraj_fname = 'ptraj' + str(h) + '.gsd'
+    directory = 'validation/' + str(h) + '/'
+    os.mkdir(directory)
+    rtraj_fname = directory + 'rtraj' + str(h) + '.gsd'
+    ptraj_fname = directory + 'ptraj' + str(h) + '.gsd'
     if ribosomes:
         hoomd.dump.gsd(rtraj_fname, period=frame_period, group=ribosomes, overwrite=True)
     if proteins:
@@ -145,7 +149,7 @@ def run():
 
     # Log 
 
-    fname = 'bdsim'+str(h)
+    fname = directory + 'bdsim'+str(h)
     with open(fname, 'w') as logfile:
         logfile.write('SIMULATION PARAMETERS\n\n')
         logfile.write('Simulation id: ' + str(h) + '\n') 
@@ -181,6 +185,6 @@ def main():
     h = run()
     
     # Analyze the simulation
-    tmeanalysis.analyze(h, dt, diff_rib, diff_prot, box_size)    
+    tmeanalysis.analyze('validation/' + str(h) + '/', h, dt, diff_rib, diff_prot, box_size)    
 
 main()

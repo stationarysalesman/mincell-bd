@@ -4,11 +4,11 @@ from gsd.hoomd import HOOMDTrajectory
 from gsd.fl import GSDFile
 import sys
 
-def analyze(h, dt, diff_rib, diff_prot, box_size):
+def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
 
-    fname = 'bdsim' + str(h)
-    rfname = 'rtraj' + str(h) + '.gsd'
-    pfname = 'ptraj' + str(h) + '.gsd'
+    fname =  directory + 'bdsim' + str(h)
+    rfname = directory + 'rtraj' + str(h) + '.gsd'
+    pfname = directory + 'ptraj' + str(h) + '.gsd'
     logfile = None 
     try:
         logfile = open(fname, 'a')
@@ -50,9 +50,11 @@ def analyze(h, dt, diff_rib, diff_prot, box_size):
         prot_msds = []
         frmDataProt = np.zeros((prot_traj.file.nframes, prot_pos0.shape[0], prot_pos0.shape[1]), dtype=prot_pos0.dtype)
         prot_ts = np.zeros(prot_traj.file.nframes)
+        ts = np.zeros(prot_traj.file.nframes)
         for i in range(prot_traj.file.nframes):
             frm = prot_traj.read_frame(i)
             frmDataProt[i,...] = frm.particles.position
+            ts[i] = dt*frm.configuration.step
         prot_max_dxs = np.max(np.abs(np.diff(frmDataProt,axis=0)), axis=(0,2))
         frmDataFiltProt = frmDataProt[:,prot_max_dxs < 0.1*box_size,:]
         prot_dx = frmDataFiltProt-frmDataFiltProt[0,:,:]

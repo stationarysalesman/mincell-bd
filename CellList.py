@@ -155,7 +155,7 @@ class CellList:
 
 box_size = 322e-9 
 split = 10 
-num_particles = 60000 
+num_particles = 6000 
 r_vdwr = 10e-9
 p_vdwr = 1e-9
 
@@ -204,16 +204,9 @@ def valid(particle):
 
     return True
 
-# Tests
-"""
-p = Particle(1, [12,0,0])
-lst = clist.computeNeighborCells(p)
-print lst
-print "len is: " + str(len(lst))
-"""
-
 
 # Place the ribosomes
+
 for i in range(600):
     print "Sampling position for ribosome " + str(i) + "."
     p = rand_pos()
@@ -224,7 +217,7 @@ for i in range(600):
         particle.pos = p 
     clist.insert(particle)
 
-
+"""
 # Place the proteins
 for i in range(num_particles):
     print "Sampling position for particle " + str(i) + "." 
@@ -235,6 +228,7 @@ for i in range(num_particles):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
+"""
 
 origin = [-box_size/2, -box_size/2, -box_size/2]
 clist.translate(origin)
