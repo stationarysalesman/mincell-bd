@@ -19,11 +19,12 @@ T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
-dt = 1e-12
+dt = 1e-9
+use_walls = True
+frame_period = 1 # how often to write trajectories
 
 # For a spherical cell with diameter 400nm, use a lattice 
 # with side length 322.39839nm (~322) to approximate the same cell volume.
-#cell_size = 32.2e-9
 box_size = 322e-9 # length of any one side of simulation box
 
 # Ribosomes
@@ -31,14 +32,12 @@ m_rib = 2700000
 diff_rib =  5e-14 # ribosome diffusion constant
 diam_rib = 20e-9
 gamma_r = kT / diff_rib # Friction coefficient 
-#gamma_r = 8.28e-08
 
 # Protein
 m_prot = 346000
 diff_prot = 10e-12 # protein diffusion constant
 diam_prot = 2e-9
 gamma_p = kT / diff_prot
-#gamma_p = 4.14e-10
 
 # Initialize the context
 hoomd.context.initialize("")
@@ -97,38 +96,47 @@ nl = hoomd.md.nlist.cell(r_buff=1e-9)
 
 # Lennard-Jones potential parameters
 rr_sigma = diam_rib/2 
-rr_epsilon = 1.69e-20
+#rr_epsilon = 1.69e-20
+rr_epsilon = 0
 rp_sigma = (diam_rib/2 + diam_prot/2)/2
-rp_epsilon = 1.69e-20 
+#rp_epsilon = 1.69e-20 
+rp_epsilon = 0 
 pp_sigma = diam_prot/2
-pp_epsilon = 1.69e-20 
+#pp_epsilon = 1.69e-20 
+pp_epsilon = 0 
 rr_cutoff = diam_rib*5
 rp_cutoff = diam_rib*5
 pp_cutoff = diam_prot*5
 lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=nl)
-lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, alpha=0)
-lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff, alpha=0)
-lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff, alpha=0)
+alpha = 1.0
+lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, alpha=alpha)
+lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff, alpha=alpha)
+lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff, alpha=alpha)
 
 
 # Wall potentials
-wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
-wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
-wall_negX = hoomd.md.wall.plane(origin=(-box_size/2, 0, 0), normal=(1.0, 0, 0), inside=True)
-wall_posX = hoomd.md.wall.plane(origin=(box_size/2, 0, 0), normal=(-1.0, 0, 0), inside=True)
-wall_negY = hoomd.md.wall.plane(origin=(0, -box_size/2, 0), normal=(0, 1.0, 0), inside=True)
-wall_posY = hoomd.md.wall.plane(origin=(0, box_size/2, 0), normal=(0, -1.0, 0), inside=True)
-wall_lst = [wall_bottom, wall_top, wall_negX, wall_negY, wall_posX, wall_posY]
-all_walls = hoomd.md.wall.group(wall_lst)
-wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*5)
-wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon)
-wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon)
-wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon)
+if use_walls:
+    wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
+    wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
+    wall_negX = hoomd.md.wall.plane(origin=(-box_size/2, 0, 0), normal=(1.0, 0, 0), inside=True)
+    wall_posX = hoomd.md.wall.plane(origin=(box_size/2, 0, 0), normal=(-1.0, 0, 0), inside=True)
+    wall_negY = hoomd.md.wall.plane(origin=(0, -box_size/2, 0), normal=(0, 1.0, 0), inside=True)
+    wall_posY = hoomd.md.wall.plane(origin=(0, box_size/2, 0), normal=(0, -1.0, 0), inside=True)
+    wall_lst = [wall_bottom, wall_top, wall_negX, wall_negY, wall_posX, wall_posY]
+    all_walls = hoomd.md.wall.group(wall_lst)
+    wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*5)
+    wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon, alpha=alpha)
+    wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon, alpha=alpha)
+    wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon, alpha=alpha)
 
 
 # Set up the simulation
 hoomd.md.integrate.mode_standard(dt=dt)
 all_parts = hoomd.group.all()
+ribosomes = hoomd.group.type(name='ribosomes', type='R')
+proteins = hoomd.group.type(name='proteins', type='P')
+print len(ribosomes)
+print len(proteins)
 bd = hoomd.md.integrate.brownian(group=all_parts, kT=kT, seed=seed) 
 bd.set_gamma('R',gamma_r)
 bd.set_gamma('P',gamma_p)
@@ -141,7 +149,10 @@ hoomd.analyze.log(filename="ribosome-protein-output.log",
 #hoomd.analyze.callback(callback=max_vel(system), period=1)
 #hoomd.analyze.callback(callback=avg_vel(system), period=1)
 
-hoomd.dump.gsd("trajectory.gsd", period=100, group=all_parts, overwrite=True)
+if ribosomes:
+    hoomd.dump.gsd("ribosome-trajectory.gsd", period=frame_period, group=ribosomes, overwrite=True)
+if proteins:
+    hoomd.dump.gsd("protein-trajectory.gsd", period=frame_period, group=proteins, overwrite=True)
 
 
 sd = lambda v1, v2: np.array([(v1[0]-v2[0])**2, (v1[1]-v2[1])**2, (v1[2]-v2[2])**2])
@@ -155,7 +166,7 @@ for i in system.particles:
 
 
 # Run the simulation
-sim_t = 1e6
+sim_t = 1e3
 
 t0 = time.clock()
 
@@ -233,12 +244,16 @@ else:
 prot_msd_scalar = math.sqrt(prot_msd[0]**2 + prot_msd[1]**2 + prot_msd[2]**2)
 
 
+# Also calculate the effective diffusion constants
+# D = kT/gamma
+eff_rib_D = rib_msd_scalar / (6 * sim_t * dt) 
+eff_prot_D = prot_msd_scalar / (6 * sim_t * dt) 
+
 # Modeled MSD (via Brownian motion equations)
 # Note: should be different depending on whether we simulated
 # for shorter/longer than relaxation time
 rib_model_msd = 6 * diff_rib * (sim_t * dt)
 prot_model_msd = 6 * diff_prot * (sim_t * dt)
-
 
 # Log 
 fname = 'sim-'+str(datetime.datetime.now())+'.log'
@@ -263,10 +278,17 @@ with open(fname, 'w') as logfile:
     logfile.write('LJ sigma for RP interaction: ' + str(rp_sigma) + '\n')
     logfile.write('LJ epsilon for PP interaction: ' + str(pp_epsilon) + '\n')
     logfile.write('LJ sigma for PP interaction: ' + str(pp_sigma) + '\n')
+    logfile.write('LJ alpha: ' + str(alpha) + '\n')
+    if use_walls:
+        logfile.write('Using LJ wall potential. Coefficients based on particle LJ parameters.\n')
+    logfile.write('Writing trajectories every ' + str(frame_period) + ' steps.\n') 
     logfile.write('\n\n')
     logfile.write('RESULTS\n\n')
-    logfile.write("Ribosome MSD: " + str(rib_msd_scalar) + '\n')
+    logfile.write("Effective ribosome MSD: " + str(rib_msd_scalar) + '\n')
     logfile.write("Model prediction of ribosome MSD: " + str(rib_model_msd) + '\n') 
-    logfile.write("Protein MSD: " + str(prot_msd_scalar) + '\n')
-    logfile.write("Model prediction of ribosome MSD: " + str(prot_model_msd) + '\n') 
-
+    logfile.write("Effective protein MSD: " + str(prot_msd_scalar) + '\n')
+    logfile.write("Model prediction of protein MSD: " + str(prot_model_msd) + '\n') 
+    logfile.write("Effective ribosome diffusion constant: " + str(eff_rib_D) + '\n')
+    logfile.write("Model prediction of ribosome diffusion constant: " + str(diff_rib) + '\n') 
+    logfile.write("Effective protein diffusion constant: " + str(eff_prot_D) + '\n')
+    logfile.write("Model prediction of protein diffusion constant: " + str(diff_prot) + '\n') 
