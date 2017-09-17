@@ -1,0 +1,30 @@
+SIMULATION PARAMETERS
+
+Simulation id: 2976789528057721835
+Simulation datetime: 2017-09-16 21:49:37.312099
+Simulation volume: 3.3386248e-20
+Number of particles: 6000
+Temperature: 300
+Seed: 42
+dt: 1e-09
+Timesteps taken: 1000.0
+Total simulation time: 1e-06
+Total wall clock time: 17.788215
+Ribosome diffusion coefficient: 5e-14
+Ribosome diameter: 2e-08
+Protein diffusion coefficient: 1e-11
+Protein diameter: 2e-09
+LJ epsilon for RR interaction: 0
+LJ sigma for RR interaction: 1e-08
+LJ epsilon for RP interaction: 0
+LJ sigma for RP interaction: 5.5e-09
+LJ epsilon for PP interaction: 0
+LJ sigma for PP interaction: 1e-09
+LJ alpha: 1.0
+Using LJ wall potential. Coefficients based on particle LJ parameters.
+Writing trajectories every 1 steps.
+
+Calculations based on trajectories:
+No ribosome trajectory.
+protein linear fit: m=5.9755376924e-11, b=-1.55611889449e-19, slope_err=0.995922948733
+protein diffusion coefficient=9.89784935722e-12 (error: 0.989784935722)

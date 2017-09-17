@@ -21,7 +21,7 @@ T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
-dt = 1e-9
+dt = 1e-10
 use_walls = True
 frame_period = 1 # how often to write trajectories
 
@@ -40,6 +40,31 @@ m_prot = 346000
 diff_prot = 10e-12 # protein diffusion constant
 diam_prot = 2e-9
 gamma_p = kT / diff_prot
+
+def pdf(position, position_list):
+    euc = lambda v1,v2: math.sqrt((v1[0]-v2[0])**2+(v1[1]-v2[1])**2+(v1[2]-v2[2])**2)
+    bins = dict()
+    for pos in position_list:
+        if pos == position:
+            continue
+        d = int(euc(position, pos) / (box_size/10))
+        try:
+            bins[d] += 1
+        except KeyError:
+            bins[d] = 1
+    pdf_dict = dict()
+    for r, c in bins.items():
+        print "r is " + str(r)
+        print "c is " + str(c)
+        if r == 0:
+            v = (4/3)*math.pi
+        else:
+            v = (4/3)*math.pi * ((r+1) ** 3) - (4/3)*math.pi*(r**3)
+        pdf_val = c / v
+        pdf_dict[r] = pdf_val
+    return pdf_dict
+
+
 
 def run():
 
@@ -83,14 +108,14 @@ def run():
 
     # Lennard-Jones potential parameters
     rr_sigma = diam_rib/2 
-    #rr_epsilon = 1.69e-20
-    rr_epsilon = 0
+    rr_epsilon = 1.69e-20
+    #rr_epsilon = 1.5e-10 
     rp_sigma = (diam_rib/2 + diam_prot/2)/2
-    #rp_epsilon = 1.69e-20 
-    rp_epsilon = 0 
+    rp_epsilon = 1.69e-20 
+    #rp_epsilon = 1.5e-10 
     pp_sigma = diam_prot/2
-    #pp_epsilon = 1.69e-20 
-    pp_epsilon = 0 
+    pp_epsilon = 1.69e-20 
+    #pp_epsilon = 1.5e-10 
     rr_cutoff = diam_rib*5
     rp_cutoff = diam_rib*5
     pp_cutoff = diam_prot*5
@@ -143,7 +168,16 @@ def run():
     # Run the simulation
     sim_t = 1e3
     t0 = time.clock()
-    hoomd.run(sim_t)
+    for i in range(int(sim_t)): 
+        hoomd.run(1)
+        if i % 100 == 0:
+            p_pos = []
+            for j in range(num_particles):
+                p_pos.append(system.particles[j].position)
+            for p in p_pos:
+                d = pdf(p, p_pos)
+                print "pdf of particle at " + str(p) + ": " + str(d)
+
     tf = time.clock()
     elapsed = tf - t0
 
