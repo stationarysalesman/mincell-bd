@@ -13,6 +13,8 @@ import re
 import sys
 import os
 import tmeanalysis
+import itertools
+import copy
 
 # All length units specified in nanometers
 
@@ -22,7 +24,9 @@ k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
 dt = 1e-9
-use_walls = True
+use_walls = True # wall potentials
+interrupt_calcs = True # run calculations at some interval
+pdf_calcs = True
 frame_period = 1 # how often to write trajectories
 
 # For a spherical cell with diameter 400nm, use a lattice 
@@ -40,6 +44,46 @@ m_prot = 346000
 diff_prot = 10e-12 # protein diffusion constant
 diam_prot = 2e-9
 gamma_p = kT / diff_prot
+
+"""
+def calc_neighbors(edge, pos, cl):
+
+    nl = list()
+    for (i,j,k), cell0 in cell_list.items():
+        for di,dj,dk in itertools.product([-1,0,1],repeat=3):
+            for (x,y,z) in cell_list.get((i+di,j+dj, k+dk), []):
+                for x0,y0,z0 in cell0:
+                    r = np.sqrt((x-x0)**2 + (y-y0)**2 + (z-z0)**2)
+                    if 0 < r <= edge:
+                        do_something(x,y,z,x0,y0,z0)
+"""
+
+def pdf(position, position_list, cell_list):
+    edge = box_size / 5 
+    euc = lambda v1,v2: np.sqrt((v1[0]-v2[0])**2+(v1[1]-v2[1])**2+(v1[2]-v2[2])**2)
+    bins = dict()
+ 
+    for pos in position_list: 
+        d = int(euc(position, pos) / edge)
+        try:
+            bins[d] += 1
+        except KeyError:
+            bins[d] = 1
+    pdf_dict = dict()
+    z = 0.0
+    for r, c in bins.items():
+        if r == 0:
+            v = (4/3)*math.pi 
+        else:
+            v = (4/3)*math.pi * (r+1)**3 - (4/3)*math.pi*(r**3)
+        pdf_val = c / v
+        pdf_dict[r] = pdf_val
+        z += pdf_val 
+    for k in pdf_dict:
+        pdf_dict[k] /= z
+    
+    return pdf_dict 
+
 
 def run():
 
@@ -83,14 +127,14 @@ def run():
 
     # Lennard-Jones potential parameters
     rr_sigma = diam_rib/2 
-    #rr_epsilon = 1.69e-20
-    rr_epsilon = 0
+    rr_epsilon = 1.69e-20
+    #rr_epsilon = 0
     rp_sigma = (diam_rib/2 + diam_prot/2)/2
-    #rp_epsilon = 1.69e-20 
-    rp_epsilon = 0 
+    rp_epsilon = 1.69e-20 
+    #rp_epsilon = 0 
     pp_sigma = diam_prot/2
-    #pp_epsilon = 1.69e-20 
-    pp_epsilon = 0 
+    pp_epsilon = 1.69e-20 
+    #pp_epsilon = 0 
     rr_cutoff = diam_rib*5
     rp_cutoff = diam_rib*5
     pp_cutoff = diam_prot*5
@@ -140,15 +184,43 @@ def run():
         hoomd.dump.gsd(ptraj_fname, period=frame_period, group=proteins, overwrite=True)
 
 
-    # Run the simulation
+    
     sim_t = 1e3
+    calc_step = 100
+    pdfArray = np.empty(shape=(int(sim_t) / calc_step, num_particles, 1), dtype=dict)
     t0 = time.clock()
-    hoomd.run(sim_t)
+    if interrupt_calcs:
+        for i in range(int(sim_t)):  
+            hoomd.run(1, quiet=True)
+            if i % 100 == 0:
+                # Recalculate neighbor list
+                cell_list = dict() 
+                positions = []
+                edge = box_size / 10 
+                for j in range(num_particles):
+                    positions.append(system.particles[j].position)
+                for (x,y,z) in positions:
+                    xi, yi, zi = int(x/edge), int(y/edge), int(z/edge)
+                try:
+                    cell_list[(xi,yi,zi)].append((x,y,z))
+                except KeyError:
+                    cell_list[(xi,yi,zi)] = [(x,y,z)]
+
+            # Calculate PDF
+                if pdf_calcs:
+                     
+                    pdf_particles = []
+                    for j in range(num_particles):
+                        pdf_particles.append(system.particles[j].position)
+                        for pos in pdf_particles:
+                            pdfArray[i/calc_step,j] = pdf(pos, pdf_particles, cell_list)
+                    print "pdf of particle n/2: " + str(pdfArray[i/calc_step,num_particles/2])
+    else:
+        hoomd.run(sim_t)
     tf = time.clock()
     elapsed = tf - t0
 
     # Log 
-
     fname = directory + 'bdsim'+str(h)
     with open(fname, 'w') as logfile:
         logfile.write('SIMULATION PARAMETERS\n\n')
@@ -159,6 +231,10 @@ def run():
         logfile.write('Temperature: ' + str(T) + '\n')
         logfile.write('Seed: ' + str(seed) + '\n')
         logfile.write('dt: ' + str(dt) + '\n')
+        if interrupt_calcs:
+            logfile.write('Intermediate calculations: \n') 
+            if pdf_calcs:
+                logfile.write('Pair distribution function\n')
         logfile.write('Timesteps taken: ' + str(sim_t) + '\n')
         logfile.write('Total simulation time: ' + str(sim_t * dt) + '\n')
         logfile.write('Total wall clock time: ' + str(tf-t0) + '\n')
@@ -188,3 +264,9 @@ def main():
     tmeanalysis.analyze('validation/' + str(h) + '/', h, dt, diff_rib, diff_prot, box_size)    
 
 main()
+
+
+
+
+# stuff
+

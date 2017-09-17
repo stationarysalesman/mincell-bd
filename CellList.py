@@ -206,8 +206,8 @@ def valid(particle):
 
 
 # Place the ribosomes
-
-for i in range(600):
+nr = raw_input("Number of ribosomes: ")
+for i in range(int(nr)):
     print "Sampling position for ribosome " + str(i) + "."
     p = rand_pos()
     particle = Particle('R', r_vdwr, p) 
@@ -217,9 +217,10 @@ for i in range(600):
         particle.pos = p 
     clist.insert(particle)
 
-"""
+
 # Place the proteins
-for i in range(num_particles):
+np = raw_input("Number of proteins: ")
+for i in range(int(np)):
     print "Sampling position for particle " + str(i) + "." 
     p = rand_pos()
     particle = Particle('P', p_vdwr, p) 
@@ -228,7 +229,7 @@ for i in range(num_particles):
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
-"""
+
 
 origin = [-box_size/2, -box_size/2, -box_size/2]
 clist.translate(origin)
