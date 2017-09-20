@@ -5,6 +5,7 @@ from gsd.fl import GSDFile
 import sys
 import re
 import matplotlib.pyplot as plt
+import phys
 
 def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
 
@@ -12,6 +13,8 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
     rfname = directory + 'rtraj' + str(h) + '.gsd'
     pfname = directory + 'ptraj' + str(h) + '.gsd'
     logfile = None 
+    f,axarr = plt.subplots(2, sharex=True)
+    plt.xlabel('time (ns)')
     try:
         logfile = open(fname, 'w')
         logfile.write('Calculations based on trajectories:\n')
@@ -21,6 +24,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
 
     ts = []
     rib_msds = []
+
     try:
         rib_traj = HOOMDTrajectory(GSDFile(rfname, "rb", "HOOMD", "hoomd"))
 
@@ -37,8 +41,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
         rib_msd = np.mean(np.sum(rib_dx*rib_dx, axis=2), axis=1)
         rib_m,rib_b = np.polyfit(ts, rib_msd, 1)
 
-        plt.plot(ts, rib_msd)
-        plt.show()
+        axarr[0].plot(ts/dt, rib_msd, color='r')
         mod_ts = ts[1:]
         mod_msd = rib_msd[1:]
         rib_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -65,6 +68,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
         prot_msd = np.mean(np.sum(prot_dx*prot_dx, axis=2), axis=1)
         prot_m,prot_b = np.polyfit(ts, prot_msd, 1)
 
+        axarr[1].plot(ts/dt, prot_msd)
         mod_ts = ts[1:]
         mod_msd = prot_msd[1:]
         prot_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -77,6 +81,16 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
 
 
     logfile.close()
+    plt.show()
+    
+    # display pdf
+    atfname = directory + 'aggregatetraj' + str(h) + '.gsd'
+    agg_traj = HOOMDTrajectory(GSDFile(atfname, "rb", "HOOMD", "hoomd"))
+    pos0 = agg_traj.read_frame(0).particles.position
+    posFinal = np.zeros(pos0.shape[0])
+    finalFrame = agg_traj.read_frame(agg_traj.file.nframes-1)
+    posFinal = finalFrame.particles.position
+    phys.pdf(posFinal, 20e-9, 322e-9)
 
 # Analyze a trajectory file
 

@@ -4,6 +4,25 @@ import copy
 import random
 import matplotlib.pyplot as plt
 
+def fun(pos):
+    Nparticles = len(pos)
+    sigma = .1 * 1e-9
+    ideal_density = (1.0 * 14.0) / (0.0821 * 300)
+    # computes dist_matrix[i,j] = |r_i - r_j|
+    dist_matrix = np.sqrt(np.sum((pos[None, ...] - pos[None, ...].transpose((1,0,2)))**2, axis=2))
+
+    # gives just the pairs below the main diagonal:
+    #e.g. [(i,j) for i in  range(N) for j in range(0,i)]
+    drs = dist_matrix[np.tril_indices_from(dist_matrix, -1)]
+
+    bins = np.linspace(0, 3*sigma, 20)
+    vols = np.diff(4/3*np.pi*bins**3)
+    counts, _ = np.histogram(drs, bins=bins)
+    gs = counts/(ideal_density*vols)/Nparticles
+    rs = 0.5*(bins[:-1]+bins[1:])
+    print gs
+    print rs
+
 def binsort(positions, dr, maxbin):
     p_arr = np.array(positions)
     c_array = copy.copy(p_arr)
@@ -25,7 +44,7 @@ def binsort(positions, dr, maxbin):
             c_array = c_array[1:]
     return hist
 
-def binnorm(hist, rho, dr):
+def binnorm(hist, rho, dr, nparticles):
     const = 4.0 * np.pi * rho / 3.0
     gr = dict()
     for b in hist:
@@ -33,23 +52,16 @@ def binnorm(hist, rho, dr):
         rupper = rlower+dr
         nideal = const * (rupper**3 - rlower**3)
         gr[b+.5*dr] = hist[b] / nideal
+#        gr[b] = hist[b] / sigma / nparticles / nideal 
     return gr
 
-def main():
-    dr = 5
-    positions = []
-    box_size = 100
-    maxbin = (box_size/2) / dr
-    random.seed(42)
-    for i in range(3000):
-        r1 = random.uniform(0, box_size)
-        r2 = random.uniform(0, box_size)
-        r3 = random.uniform(0, box_size)
-        positions.append([r1, r2, r3])
+def pdf(positions, dr, edge):
+    print positions
+    maxbin = int(edge / dr)
+    rho = (1.0 * 14.0) / (8.314 * 300)
+    hist = dict()
     hist = binsort(positions, dr, maxbin)
-    rho = 1.0
-    hist = binnorm(hist, rho, dr)
-    
+    hist = binnorm(hist, rho, dr, len(positions)) 
     x = []
     y = []
     for k in sorted(hist.iterkeys()):
@@ -59,4 +71,4 @@ def main():
     plt.show()
 
 
-main()
+
