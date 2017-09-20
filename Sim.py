@@ -25,7 +25,7 @@ kT = k_b * T
 seed = 42
 dt = 1e-9
 use_walls = True # wall potentials
-interrupt_calcs = True # run calculations at some interval
+interrupt_calcs = False # run calculations at some interval
 pdf_calcs = True
 frame_period = 1 # how often to write trajectories
 
@@ -127,17 +127,17 @@ def run():
 
     # Lennard-Jones potential parameters
     rr_sigma = diam_rib/2 
-    rr_epsilon = 1.69e-20
-    #rr_epsilon = 0
+    #rr_epsilon = 1.69e-20
+    rr_epsilon = 0
     rp_sigma = (diam_rib/2 + diam_prot/2)/2
-    rp_epsilon = 1.69e-20 
-    #rp_epsilon = 0 
+    #rp_epsilon = 1.69e-20 
+    rp_epsilon = 0 
     pp_sigma = diam_prot/2
-    pp_epsilon = 1.69e-20 
-    #pp_epsilon = 0 
-    rr_cutoff = diam_rib*5
-    rp_cutoff = diam_rib*5
-    pp_cutoff = diam_prot*5
+    #pp_epsilon = 1.69e-20 
+    pp_epsilon = 0 
+    rr_cutoff = diam_rib*1.5
+    rp_cutoff = diam_rib*1.5
+    pp_cutoff = diam_prot*1.5
     lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=nl)
     alpha = 1.0
     lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, alpha=alpha)
@@ -189,34 +189,7 @@ def run():
     calc_step = 100
     pdfArray = np.empty(shape=(int(sim_t) / calc_step, num_particles, 1), dtype=dict)
     t0 = time.clock()
-    if interrupt_calcs:
-        for i in range(int(sim_t)):  
-            hoomd.run(1, quiet=True)
-            if i % 100 == 0:
-                # Recalculate neighbor list
-                cell_list = dict() 
-                positions = []
-                edge = box_size / 10 
-                for j in range(num_particles):
-                    positions.append(system.particles[j].position)
-                for (x,y,z) in positions:
-                    xi, yi, zi = int(x/edge), int(y/edge), int(z/edge)
-                try:
-                    cell_list[(xi,yi,zi)].append((x,y,z))
-                except KeyError:
-                    cell_list[(xi,yi,zi)] = [(x,y,z)]
-
-            # Calculate PDF
-                if pdf_calcs:
-                     
-                    pdf_particles = []
-                    for j in range(num_particles):
-                        pdf_particles.append(system.particles[j].position)
-                        for pos in pdf_particles:
-                            pdfArray[i/calc_step,j] = pdf(pos, pdf_particles, cell_list)
-                    print "pdf of particle n/2: " + str(pdfArray[i/calc_step,num_particles/2])
-    else:
-        hoomd.run(sim_t)
+    hoomd.run(sim_t)
     tf = time.clock()
     elapsed = tf - t0
 
@@ -226,7 +199,7 @@ def run():
         logfile.write('SIMULATION PARAMETERS\n\n')
         logfile.write('Simulation id: ' + str(h) + '\n') 
         logfile.write('Simulation datetime: ' + str(datetime.datetime.now()) + '\n') 
-        logfile.write('Simulation volume: ' + str((box_size)**3) + '\n')
+        logfile.write('Edge length: ' + str(box_size) + '\n')
         logfile.write('Number of particles: ' + str(num_particles) + '\n')
         logfile.write('Temperature: ' + str(T) + '\n')
         logfile.write('Seed: ' + str(seed) + '\n')
@@ -260,9 +233,6 @@ def main():
     # Run the simulation
     h = run()
     
-    # Analyze the simulation
-    tmeanalysis.analyze('validation/' + str(h) + '/', h, dt, diff_rib, diff_prot, box_size)    
-
 main()
 
 
