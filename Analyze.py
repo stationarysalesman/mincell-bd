@@ -7,7 +7,7 @@ import re
 import matplotlib.pyplot as plt
 import phys
 
-def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
+def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
 
     fname = directory+'trajlog-'+str(h) 
     rfname = directory + 'rtraj' + str(h) + '.gsd'
@@ -90,7 +90,11 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
     posFinal = np.zeros(pos0.shape[0])
     finalFrame = agg_traj.read_frame(agg_traj.file.nframes-1)
     posFinal = finalFrame.particles.position
-    phys.pdf(posFinal, 1e-9, 322e-9)
+    maxb = 200e-9
+    dr = 2e-9
+    edge = maxb/dr
+    phys.pdf(posFinal, 2e-9, 200e-9, rho)
+
 
 # Analyze a trajectory file
 
@@ -113,5 +117,6 @@ dt = float(d['dt'])
 diff_rib = float(d['Ribosome diffusion coefficient'])
 diff_prot = float(d['Protein diffusion coefficient'])
 box_size = float(d['Edge length'])
+rho = float(d['Simulation density (particle volume/simulation volume)'])
 
-analyze(directory, h, dt, diff_rib, diff_prot, box_size)
+analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho)

@@ -36,16 +36,16 @@ def binsort(positions, dr, maxbin):
             cx,cy,cz = c
             d = np.sqrt((cx-px)**2+(cy-py)**2+(cz-pz)**2)
             b = int(d/dr) + 1
-            if b <= maxbin:
-                try:
-                    hist[b] += 2
-                except KeyError:
-                    hist[b] = 2
+            #if b <= maxbin:
+            try:
+                hist[b] += 2
+            except KeyError:
+                hist[b] = 2
             c_array = c_array[1:]
     return hist
 
 def binnorm(hist, rho, dr, nparticles):
-    const = 4.0 * np.pi * rho / 3.0
+    const = (4.0 * np.pi * rho) / 3.0
     gr = dict()
     for b in hist:
         rlower = (b-1)*dr
@@ -55,18 +55,26 @@ def binnorm(hist, rho, dr, nparticles):
 #        gr[b] = hist[b] / sigma / nparticles / nideal 
     return gr
 
-def pdf(positions, dr, edge):
+def binsort_one(positions, dr):
+    target = positions.pop(601)
+    friends = np.array(positions)
+    target_arr = np.zeros(friends.shape) 
+    target_arr = np.sqrt(np.sum(np.square(friends - target), axis=1))
+    target_arr.astype(int)
+    
+
+def pdf(positions, dr, edge, rho):
     maxbin = int(edge / dr)
-    rho = (1.0 * 14.0) / (8.314 * 300)
     hist = dict()
     hist = binsort(positions, dr, maxbin)
     hist = binnorm(hist, rho, dr, len(positions)) 
+    print hist
     x = []
     y = []
     for k in sorted(hist.iterkeys()):
         x.append(k)
         y.append(hist[k])
-    plt.scatter(x,y)
+    plt.plot(x,y)
     plt.show()
 
 

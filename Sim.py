@@ -6,7 +6,7 @@ import hoomd.md
 import random
 import math
 import string
-import numpy as np
+import numpy as np 
 import time  # is there a real life analog for this import statement?
 import datetime
 import re
@@ -88,7 +88,6 @@ def run():
         else:
             snapshot.particles.typeid[i] = 1
             snapshot.particles.diameter[i] = diam_prot
-
         snapshot.particles.position[i] = particles[i][2] 
 
     system = hoomd.init.read_snapshot(snapshot)
@@ -148,11 +147,18 @@ def run():
     all_parts = hoomd.group.all()
     ribosomes = hoomd.group.type(name='ribosomes', type='R')
     proteins = hoomd.group.type(name='proteins', type='P')
-    print len(ribosomes)
-    print len(proteins)
     bd = hoomd.md.integrate.brownian(group=all_parts, kT=kT, seed=seed) 
     bd.set_gamma('R',gamma_r)
     bd.set_gamma('P',gamma_p)
+
+    # Calculate avg density (total particle volume/simulation volume)
+    v_rib = (4 / 3.) * np.pi * ((diam_rib/2.)**3)
+    v_prot = (4 / 3.) * np.pi * ((diam_prot/2.)**3)
+    v_total = (4 / 3.) * np.pi * (cell_radius**3)
+    num_ribosomes = len(ribosomes)
+    num_proteins = len(proteins)
+    particle_vol = num_ribosomes * v_rib + num_proteins * v_prot
+    avg_density = particle_vol / v_total
 
     # Create log directory
     h = abs(hash((datetime.datetime.now())) + hash(seed))
@@ -184,13 +190,10 @@ def run():
         logfile.write('Simulation datetime: ' + str(datetime.datetime.now()) + '\n') 
         logfile.write('Edge length: ' + str(box_size) + '\n')
         logfile.write('Number of particles: ' + str(num_particles) + '\n')
+        logfile.write('Simulation density (particle volume/simulation volume): ' + str(avg_density) + '\n')
         logfile.write('Temperature: ' + str(T) + '\n')
         logfile.write('Seed: ' + str(seed) + '\n')
         logfile.write('dt: ' + str(dt) + '\n')
-        if interrupt_calcs:
-            logfile.write('Intermediate calculations: \n') 
-            if pdf_calcs:
-                logfile.write('Pair distribution function\n')
         logfile.write('Timesteps taken: ' + str(sim_t) + '\n')
         logfile.write('Total simulation time: ' + str(sim_t * dt) + '\n')
         logfile.write('Total wall clock time: ' + str(tf-t0) + '\n')
