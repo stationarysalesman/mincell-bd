@@ -41,7 +41,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
         rib_msd = np.mean(np.sum(rib_dx*rib_dx, axis=2), axis=1)
         rib_m,rib_b = np.polyfit(ts, rib_msd, 1)
 
-        axarr[0].plot(ts/dt, rib_msd, color='r')
+        axarr[0].scatter(ts/dt, rib_msd, color='r')
         mod_ts = ts[1:]
         mod_msd = rib_msd[1:]
         rib_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -68,7 +68,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
         prot_msd = np.mean(np.sum(prot_dx*prot_dx, axis=2), axis=1)
         prot_m,prot_b = np.polyfit(ts, prot_msd, 1)
 
-        axarr[1].plot(ts/dt, prot_msd)
+        axarr[1].scatter(ts/dt, prot_msd)
         mod_ts = ts[1:]
         mod_msd = prot_msd[1:]
         prot_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -90,7 +90,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
     posFinal = np.zeros(pos0.shape[0])
     finalFrame = agg_traj.read_frame(agg_traj.file.nframes-1)
     posFinal = finalFrame.particles.position
-    phys.pdf(posFinal, 20e-9, 322e-9)
+    phys.pdf(posFinal, 1e-9, 322e-9)
 
 # Analyze a trajectory file
 

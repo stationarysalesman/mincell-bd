@@ -56,7 +56,6 @@ def binnorm(hist, rho, dr, nparticles):
     return gr
 
 def pdf(positions, dr, edge):
-    print positions
     maxbin = int(edge / dr)
     rho = (1.0 * 14.0) / (8.314 * 300)
     hist = dict()
@@ -67,7 +66,7 @@ def pdf(positions, dr, edge):
     for k in sorted(hist.iterkeys()):
         x.append(k)
         y.append(hist[k])
-    plt.plot(x,y)
+    plt.scatter(x,y)
     plt.show()
 
 
