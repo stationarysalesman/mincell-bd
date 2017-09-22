@@ -23,15 +23,14 @@ T = 300 # Temperature in Kelvin
 k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
-dt = 1e-9
-use_walls = True # wall potentials
+dt = 1e-12
+use_planar_wall = False # planar wall potentials
+use_sphere_wall = True # sphere wall potential
+cell_radius = 200e-9 # Radius of minimal cell
 interrupt_calcs = False # run calculations at some interval
-pdf_calcs = True
-frame_period = 1 # how often to write trajectories
+frame_period = 100 # how often to write trajectories
 
-# For a spherical cell with diameter 400nm, use a lattice 
-# with side length 322.39839nm (~322) to approximate the same cell volume.
-box_size = 322e-9 # length of any one side of simulation box
+box_size = 400e-9 # length of any one side of simulation box
 
 # Ribosomes
 m_rib = 2700000
@@ -57,33 +56,6 @@ def calc_neighbors(edge, pos, cl):
                     if 0 < r <= edge:
                         do_something(x,y,z,x0,y0,z0)
 """
-
-def pdf(position, position_list, cell_list):
-    edge = box_size / 5 
-    euc = lambda v1,v2: np.sqrt((v1[0]-v2[0])**2+(v1[1]-v2[1])**2+(v1[2]-v2[2])**2)
-    bins = dict()
- 
-    for pos in position_list: 
-        d = int(euc(position, pos) / edge)
-        try:
-            bins[d] += 1
-        except KeyError:
-            bins[d] = 1
-    pdf_dict = dict()
-    z = 0.0
-    for r, c in bins.items():
-        if r == 0:
-            v = (4/3)*math.pi 
-        else:
-            v = (4/3)*math.pi * (r+1)**3 - (4/3)*math.pi*(r**3)
-        pdf_val = c / v
-        pdf_dict[r] = pdf_val
-        z += pdf_val 
-    for k in pdf_dict:
-        pdf_dict[k] /= z
-    
-    return pdf_dict 
-
 
 def run():
 
@@ -127,14 +99,14 @@ def run():
 
     # Lennard-Jones potential parameters
     rr_sigma = diam_rib/2 
-    #rr_epsilon = 1.69e-20
-    rr_epsilon = 0
+    rr_epsilon = 1.69e-20
+    #rr_epsilon = 0
     rp_sigma = (diam_rib/2 + diam_prot/2)/2
-    #rp_epsilon = 1.69e-20 
-    rp_epsilon = 0 
+    rp_epsilon = 1.69e-20 
+    #rp_epsilon = 0 
     pp_sigma = diam_prot/2
-    #pp_epsilon = 1.69e-20 
-    pp_epsilon = 0 
+    pp_epsilon = 1.69e-20 
+    #pp_epsilon = 0 
     rr_cutoff = diam_rib*1.5
     rp_cutoff = diam_rib*1.5
     pp_cutoff = diam_prot*1.5
@@ -144,9 +116,9 @@ def run():
     lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, r_cut=rp_cutoff, alpha=alpha)
     lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, r_cut=pp_cutoff, alpha=alpha)
 
-
+    
     # Wall potentials
-    if use_walls:
+    if use_planar_wall:
         wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), normal=(0, 0, 1.0), inside=True)
         wall_top = hoomd.md.wall.plane(origin=(0, 0, box_size/2), normal=(0, 0, -1.0), inside=True)
         wall_negX = hoomd.md.wall.plane(origin=(-box_size/2, 0, 0), normal=(1.0, 0, 0), inside=True)
@@ -159,7 +131,17 @@ def run():
         wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon, alpha=alpha)
         wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon, alpha=alpha)
         wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon, alpha=alpha)
+    
 
+    # Sphere potential
+    elif use_sphere_wall:
+        sphere_potential = hoomd.md.wall.sphere(cell_radius)
+        all_walls = hoomd.md.wall.group([sphere_potential])
+        wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*5)
+        wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon, alpha=alpha)
+        wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon, alpha=alpha)
+        wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon, alpha=alpha)
+    
 
     # Set up the simulation
     hoomd.md.integrate.mode_standard(dt=dt)
@@ -183,7 +165,8 @@ def run():
     if proteins:
         hoomd.dump.gsd(ptraj_fname, period=frame_period, group=proteins, overwrite=True)
 
-
+    # dump both for pdf
+    hoomd.dump.gsd(directory + 'aggregatetraj' + str(h) + '.gsd', period=frame_period, group=all_parts, overwrite=True)
     
     sim_t = 1e3
     calc_step = 100
@@ -222,8 +205,10 @@ def run():
         logfile.write('LJ epsilon for PP interaction: ' + str(pp_epsilon) + '\n')
         logfile.write('LJ sigma for PP interaction: ' + str(pp_sigma) + '\n')
         logfile.write('LJ alpha: ' + str(alpha) + '\n')
-        if use_walls:
-            logfile.write('Using LJ wall potential. Coefficients based on particle LJ parameters.\n')
+        if use_sphere_wall:
+            logfile.write('Using LJ wall potential (sphere). Coefficients based on particle LJ parameters.\n')
+        if use_planar_wall:
+            logfile.write('Using LJ wall potential (planar). Coefficients based on particle LJ parameters.\n')
         logfile.write('Writing trajectories every ' + str(frame_period) + ' steps.\n') 
         logfile.write('\n')
     return h

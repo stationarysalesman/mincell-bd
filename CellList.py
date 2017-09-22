@@ -6,12 +6,14 @@ import hoomd.md
 import random
 import math
 import sys
+import itertools
+import numpy as np
 # Utilities for setting up the simulation
 
 class Particle:
     """Store properties needed to place particles"""
 
-    def __init__(self, species, vdwr, pos = [0.0, 0.0, 0.0]):
+    def __init__(self, species, vdwr, pos = np.zeros(3)):
         self.species = species 
         self.vdwr = vdwr
         self.pos = pos
@@ -34,142 +36,71 @@ class Cell:
 
 class CellList:
  
-    euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
-    in_range = lambda v: v >= 0 and v <= n_split
-    valid_idx_lst = lambda l: in_range(l[0]) and in_range(l[1]) and in_range(l[2])
-
    
-    def __init__(self, size=100, n_split=10):
-        self.n_split = n_split
-        self.cells = dict() 
-        self.in_range = lambda v: v >= 0 and v < n_split
-        self.valid_idx_lst = lambda l: self.in_range(l[0]) and self.in_range(l[1]) and self.in_range(l[2])
-         
-        for i in range(n_split):
-            self.cells[i] = dict()
-            for j in range(n_split):
-                self.cells[i][j] = dict()
-                for k in range(n_split):
-                    self.cells[i][j][k] = Cell()
-
-
+    def __init__(self, edge):
+        self.edge = edge
+        self.cell_list = dict() 
+        self.euc = lambda a1, a2: np.sqrt(np.sum(np.square(np.diff((a1,a2), axis=0))))
+      
     def insert(self, particle):
         """Insert a particle into its cell."""
-        p = particle.pos
-        i = int(p[0] / (float(box_size) / self.n_split))
-        j = int(p[1] / (float(box_size) / self.n_split))
-        k = int(p[2] / (float(box_size) / self.n_split))
-        the_cell = self.cells[i][j][k]
-        the_cell.particles.append(particle)
-
-
-    def dump(self):
-        """Dump all particles into a list. Useful, probably"""
-        master_list = list()
-        for cx in self.cells:
-            for cy in self.cells[cx]:
-                for cz in self.cells[cx][cy]:
-                    for particle in self.cells[cx][cy][cz].particles:
-                        master_list.append(particle)
-        return master_list 
+        x,y,z = particle.pos
+        xi, yi, zi = int(x/edge), int(y/edge), int(z/edge)
+        try:
+            self.cell_list[(xi,yi,zi)].append(particle)
+        except KeyError:
+            self.cell_list[(xi,yi,zi)] = [particle]
 
 
     def translate(self, origin):
         """Translate all particles to a new origin."""
-        master_list = self.dump()
-        for particle in master_list:
-            particle.pos[0] += origin[0]
-            particle.pos[1] += origin[1]
-            particle.pos[2] += origin[2]
+        for particle_lst in self.cell_list.values():
+            for particle in particle_lst:
+                particle.pos += origin
+
         return
 
 
     def export(self):
         """Export particle configuration to a file."""
-        master_list = self.dump()
         with open('particle_config.txt', 'w') as of:
-            for particle in master_list:
-                of.write(particle.species + ',' + str(particle.vdwr) + ',' + str(particle.pos[0]) + ',' + str(particle.pos[1]) + ',' + str(particle.pos[2]) + '\n')
+            for particle_lst in self.cell_list.values():
+                for particle in particle_lst:
+                    of.write(particle.species + ',' + str(particle.vdwr) + ',' + str(particle.pos[0]) + ',' + str(particle.pos[1]) + ',' + str(particle.pos[2]) + '\n')
 
-    def generateIndices(self, i, j, k):
-        """Generate valid neighbor cell indices for cell (i, j, k)."""
-        idx_lst = list()
-        for x in range(i-1, i+2):
-            for y in range(j-1, j+2):
-                for z in range(k-1, k+2):
-                    idx_lst.append((x,y,z))
-        s = set(idx_lst)
-        idx_lst = list(s)
-
-        return filter(self.valid_idx_lst, idx_lst)
-   
 
     def getNeighbors(self, particle):
         """Compute a given particle's neighbor list."""
-        p = particle.pos
-        i = int(p[0] / (float(box_size) / self.n_split))
-        j = int(p[1] / (float(box_size) / self.n_split))
-        k = int(p[2] / (float(box_size) / self.n_split))
-        idx_lst = self.generateIndices(i, j, k)
-        neighbor_lst = list()
-        for tup in idx_lst:
-            x, y, z = tup
-            for particle in self.cells[x][y][z].particles:
-                neighbor_lst.append(particle)
-        return neighbor_lst
+        x,y,z = particle.pos
+        i,j,k = int(x/edge), int(y/edge), int(z/edge)
+        nl = list()
+        for di,dj,dk in itertools.product([-1,0,1],repeat=3):
+            for particle in self.cell_list.get((i+di,j+dj,k+dk), []):
+               nl.append(particle)
+        return nl
 
+     
 
-    def computeNeighborCells(self, particle):
-        """Determine which cell holds a particle, and the cells 
-        holding its neighbors."""
-        p = particle.pos
-        i = int(p[0] / (float(box_size) / self.n_split))
-        j = int(p[1] / (float(box_size) / self.n_split))
-        k = int(p[2] / (float(box_size) / self.n_split))
-        return self.generateIndices(i, j, k)
-
-
-    def test(self):
-        print "Performing acceptance test..."
-        master_list = self.dump()
-        N = len(master_list)
-        i = 0
-        while not len(master_list) == 0:
-            sys.stdout.write('\rProgress: {:.0%}'.format((i * 1.0) / N) )
-            sys.stdout.flush()
-            obj = master_list.pop()
-            p_pos = obj.pos
-            p_vdwr = obj.vdwr
-            for neighbor in master_list:
-                neighbor_pos = neighbor.pos
-                neighbor_vdwr = neighbor.vdwr
-                dist = euc(p_pos, neighbor_pos)
-                thresh = (p_vdwr + neighbor_vdwr) / 2
-                if dist < thresh:
-                    print "Error (particle " + str(i) + "): acceptable distance: " + str(thresh) + ", actual distance: " + str(dist)
-                    return False 
-            i += 1
-        sys.stdout.write('\n')
-        return True 
-
-
-box_size = 322e-9 
-split = 10 
+box_size = 400e-9 
+split = 20
+edge = float(box_size / split)
 num_particles = 6000 
 r_vdwr = 10e-9
 p_vdwr = 1e-9
 
+euc = lambda a1, a2: np.sqrt(np.sum(np.square(np.diff((a1,a2), axis=0))))
 
 
-clist = CellList(box_size, split)
+clist = CellList(edge)
 
-euc = lambda v1, v2: math.sqrt((v1[0]-v2[0])**2 + (v1[1]-v2[1])**2 + (v1[2]-v2[2])**2)
+r = 200e-9
 
 def rand_pos():
     r1 = random.uniform(0, box_size)
     r2 = random.uniform(0, box_size)
     r3 = random.uniform(0, box_size)
-    return [r1, r2, r3]
+    return np.array((r1, r2, r3))
+
 
 def valid(particle):
     """Determine if a given position is within some distance of any 
@@ -186,6 +117,7 @@ def valid(particle):
         if dist <= thresh:
             return False
 
+    """
     # Too close to wall?
     wall_points = list()
     for i in range(3):
@@ -200,9 +132,18 @@ def valid(particle):
         dist = euc(p_pos, p)
         if dist <= 5*p_vdwr:
             return False
+    """
 
+    # Within the sphere, and far enough away from potential?
+    r = 200e-9
+    a = np.array(p_pos)
+    a -= (r, r, r)
+    r_dist = np.sqrt(np.sum(a*a))
+    if r_dist <= r * 0.75:
+        return True 
 
-    return True
+    else:
+        return False 
 
 
 # Place the ribosomes
@@ -212,22 +153,22 @@ for i in range(int(nr)):
     p = rand_pos()
     particle = Particle('R', r_vdwr, p) 
     while not valid(particle):
-        print "Resampling..."
+        #print "Resampling..."
         p = rand_pos()
         particle.pos = p 
     clist.insert(particle)
 
 
 # Place the proteins
-np = raw_input("Number of proteins: ")
-for i in range(int(np)):
+_np = raw_input("Number of proteins: ")
+for i in range(int(_np)):
     print "Sampling position for particle " + str(i) + "." 
-    p = rand_pos()
-    particle = Particle('P', p_vdwr, p) 
+    z = rand_pos()
+    particle = Particle('P', p_vdwr, z) 
     while not valid(particle):
-        print "Resampling..."
-        p = rand_pos()
-        particle.pos = p 
+        #print "Resampling..."
+        z = rand_pos()
+        particle.pos = z 
     clist.insert(particle)
 
 
