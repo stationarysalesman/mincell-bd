@@ -43,7 +43,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
 
         ymin = np.min(rib_msd)
         ymax = np.max(rib_msd)
-        axarr[0].scatter(ts/dt, rib_msd, color='r', s=1)
+        axarr[0].scatter(ts/dt, rib_msd, color='r', s=.4)
         axarr[0].set_ylim([ymin, ymax])
         mod_ts = ts[1:]
         mod_msd = rib_msd[1:]
@@ -72,7 +72,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
         prot_m,prot_b = np.polyfit(ts, prot_msd, 1)
         ymin_p = np.min(prot_msd)
         ymax_p = np.max(prot_msd)
-        axarr[1].scatter(ts/dt, prot_msd)
+        axarr[1].scatter(ts/dt, prot_msd, s=.4)
         axarr[1].set_ylim([ymin_p, ymax_p])
         mod_ts = ts[1:]
         mod_msd = prot_msd[1:]
@@ -98,7 +98,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
     maxb = 200e-9
     dr = 2e-9
     edge = maxb/dr
-    phys.pdf(posFinal, 10e-9, 200e-9, rho)
+    phys.pdf(posFinal, 2e-9, 200e-9, rho)
 
 
 # Analyze a trajectory file

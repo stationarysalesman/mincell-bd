@@ -51,8 +51,8 @@ def binnorm(hist, rho, dr, nparticles):
         rlower = (b-1)*dr
         rupper = rlower+dr
         nideal = const * (rupper**3 - rlower**3)
-        gr[b+.5*dr] = hist[b] / nideal
-#        gr[b] = hist[b] / sigma / nparticles / nideal 
+        #gr[b+.5*dr] = hist[b] / nideal
+        gr[b] = hist[b] / float(nparticles) / nideal 
     return gr
 
 def binsort_one(positions, dr):
@@ -74,7 +74,8 @@ def pdf(positions, dr, edge, rho):
     for k in sorted(hist.iterkeys()):
         x.append(k)
         y.append(hist[k])
-    plt.plot(x,y)
+    
+    plt.scatter(x,y, s=.5, color='red')
     plt.show()
 
 
