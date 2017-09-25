@@ -7,12 +7,13 @@ import re
 import matplotlib.pyplot as plt
 import phys
 
-def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
+def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigma_rp, sigma_pp):
 
     fname = directory+'trajlog-'+str(h) 
     rfname = directory + 'rtraj' + str(h) + '.gsd'
     pfname = directory + 'ptraj' + str(h) + '.gsd'
     logfile = None 
+    """ 
     f,axarr = plt.subplots(2, sharex=True)
     plt.xlabel('time (ns)')
     try:
@@ -24,7 +25,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
 
     ts = []
     rib_msds = []
-
+    
     try:
         rib_traj = HOOMDTrajectory(GSDFile(rfname, "rb", "HOOMD", "hoomd"))
 
@@ -43,8 +44,9 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
 
         ymin = np.min(rib_msd)
         ymax = np.max(rib_msd)
-        axarr[0].scatter(ts/dt, rib_msd, color='r', s=.4)
+        axarr[0].scatter(ts/dt, rib_msd, color='r', s=.2)
         axarr[0].set_ylim([ymin, ymax])
+        axarr[0].set_ylabel('$<r^2>$: Ribosomes')
         mod_ts = ts[1:]
         mod_msd = rib_msd[1:]
         rib_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -72,8 +74,9 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
         prot_m,prot_b = np.polyfit(ts, prot_msd, 1)
         ymin_p = np.min(prot_msd)
         ymax_p = np.max(prot_msd)
-        axarr[1].scatter(ts/dt, prot_msd, s=.4)
+        axarr[1].scatter(ts/dt, prot_msd, s=.2)
         axarr[1].set_ylim([ymin_p, ymax_p])
+        axarr[1].set_ylabel('$<r^2>$: Proteins')
         mod_ts = ts[1:]
         mod_msd = prot_msd[1:]
         prot_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -87,7 +90,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
 
     logfile.close()
     plt.show()
-    
+    """ 
     # display pdf
     atfname = directory + 'aggregatetraj' + str(h) + '.gsd'
     agg_traj = HOOMDTrajectory(GSDFile(atfname, "rb", "HOOMD", "hoomd"))
@@ -96,9 +99,9 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho):
     finalFrame = agg_traj.read_frame(agg_traj.file.nframes-1)
     posFinal = finalFrame.particles.position
     maxb = 200e-9
-    dr = 2e-9
+    dr = 10e-9
     edge = maxb/dr
-    phys.pdf(posFinal, 2e-9, 200e-9, rho)
+    phys.pdf(posFinal, dr, 200e-9, rho, sigma_rr, sigma_rp, sigma_pp)
 
 
 # Analyze a trajectory file
@@ -124,5 +127,7 @@ diff_rib = float(d['Ribosome diffusion coefficient'])
 diff_prot = float(d['Protein diffusion coefficient'])
 box_size = float(d['Edge length'])
 rho = float(d['Simulation density (particle volume/simulation volume)'])
-
-analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho)
+sigma_rr = float(d['LJ sigma for RR interaction'])
+sigma_rp = float(d['LJ sigma for RP interaction'])
+sigma_pp = float(d['LJ sigma for PP interaction'])
+analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigma_rp, sigma_pp)

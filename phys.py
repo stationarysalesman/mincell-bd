@@ -4,26 +4,7 @@ import copy
 import random
 import matplotlib.pyplot as plt
 
-def fun(pos):
-    Nparticles = len(pos)
-    sigma = .1 * 1e-9
-    ideal_density = (1.0 * 14.0) / (0.0821 * 300)
-    # computes dist_matrix[i,j] = |r_i - r_j|
-    dist_matrix = np.sqrt(np.sum((pos[None, ...] - pos[None, ...].transpose((1,0,2)))**2, axis=2))
-
-    # gives just the pairs below the main diagonal:
-    #e.g. [(i,j) for i in  range(N) for j in range(0,i)]
-    drs = dist_matrix[np.tril_indices_from(dist_matrix, -1)]
-
-    bins = np.linspace(0, 3*sigma, 20)
-    vols = np.diff(4/3*np.pi*bins**3)
-    counts, _ = np.histogram(drs, bins=bins)
-    gs = counts/(ideal_density*vols)/Nparticles
-    rs = 0.5*(bins[:-1]+bins[1:])
-    print gs
-    print rs
-
-def binsort(positions, dr, maxbin):
+def binsort(positions, dr):
     p_arr = np.array(positions)
     c_array = copy.copy(p_arr)
     hist = dict()
@@ -35,8 +16,7 @@ def binsort(positions, dr, maxbin):
             px,py,pz = p
             cx,cy,cz = c
             d = np.sqrt((cx-px)**2+(cy-py)**2+(cz-pz)**2)
-            b = int(d/dr) + 1
-            #if b <= maxbin:
+            b = int(d/dr)+1
             try:
                 hist[b] += 2
             except KeyError:
@@ -47,35 +27,47 @@ def binsort(positions, dr, maxbin):
 def binnorm(hist, rho, dr, nparticles):
     const = (4.0 * np.pi * rho) / 3.0
     gr = dict()
+    print "normalizing keys : " + str(hist.keys())
     for b in hist:
         rlower = (b-1)*dr
         rupper = rlower+dr
         nideal = const * (rupper**3 - rlower**3)
-        #gr[b+.5*dr] = hist[b] / nideal
         gr[b] = hist[b] / float(nparticles) / nideal 
     return gr
 
-def binsort_one(positions, dr):
-    target = positions.pop(601)
-    friends = np.array(positions)
-    target_arr = np.zeros(friends.shape) 
-    target_arr = np.sqrt(np.sum(np.square(friends - target), axis=1))
-    target_arr.astype(int)
-    
 
-def pdf(positions, dr, edge, rho):
-    maxbin = int(edge / dr)
+def pdf(positions, dr, edge, rho, sigma_rr, sigma_rp, sigma_pp):
     hist = dict()
-    hist = binsort(positions, dr, maxbin)
+    hist = binsort(positions, dr)
     hist = binnorm(hist, rho, dr, len(positions)) 
-    print hist
     x = []
     y = []
     for k in sorted(hist.iterkeys()):
         x.append(k)
         y.append(hist[k])
+  
+    x = np.array(x)
+    y = np.array(y)
+    x = x * dr
+    print dr
+    plt.scatter(x,y, s=10, color='red')
+    plt.xlabel('radius')
+    plt.ylabel('G(r)')
+    plt.xlim((0, max(x)))
     
-    plt.scatter(x,y, s=.5, color='red')
+    z = np.polyfit(x,y,12)
+    p = np.poly1d(z)
+    plt.plot(x, p(x),"r--", color='gray')
+
+    # Sigmas
+    line1 = plt.axvline(sigma_rr, color='green', label='Sigma')
+    line4 = plt.axvline(sigma_rr*2, color='green')
+    line5 = plt.axvline(sigma_rr*3, color='green')
+    line6 = plt.axvline(sigma_rr*4, color='green')
+    line7 = plt.axvline(sigma_rr*5, color='green')
+    #line2 = plt.axvline(sigma_rp, color='green')
+    #line3 = plt.axvline(sigma_pp, color='green')
+    plt.legend(handles=[line1])
     plt.show()
 
 

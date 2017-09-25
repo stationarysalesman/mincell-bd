@@ -139,7 +139,7 @@ def valid(particle):
     a = np.array(p_pos)
     a -= (r, r, r)
     r_dist = np.sqrt(np.sum(a*a))
-    if r_dist <= r * 0.75:
+    if r_dist <= r * 0.9:
         return True 
 
     else:
