@@ -113,7 +113,7 @@ def valid(particle):
         neighbor_pos = neighbor.pos
         neighbor_vdwr = neighbor.vdwr
         dist = euc(p_pos, neighbor_pos)
-        thresh = (p_vdwr + neighbor_vdwr) / 2
+        thresh = p_vdwr + neighbor_vdwr
         if dist <= thresh:
             return False
 
