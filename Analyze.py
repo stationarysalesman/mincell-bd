@@ -13,9 +13,12 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigm
     rfname = directory + 'rtraj' + str(h) + '.gsd'
     pfname = directory + 'ptraj' + str(h) + '.gsd'
     logfile = None 
-    """ 
-    f,axarr = plt.subplots(2, sharex=True)
-    plt.xlabel('time (ns)')
+    rib_traj = None
+    prot_traj = None
+      
+    f,axarr = plt.subplots(2)
+    plt.xlabel('time (ns)') 
+    
     try:
         logfile = open(fname, 'w')
         logfile.write('Calculations based on trajectories:\n')
@@ -44,18 +47,29 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigm
 
         ymin = np.min(rib_msd)
         ymax = np.max(rib_msd)
-        axarr[0].scatter(ts/dt, rib_msd, color='r', s=.2)
+        xmin = 0.0
+        scaled_x = ts*1e9
+        xmax = np.max(scaled_x)
         axarr[0].set_ylim([ymin, ymax])
-        axarr[0].set_ylabel('$<r^2>$: Ribosomes')
+        axarr[0].set_xlim([xmin, xmax])
+        axarr[0].set_ylabel('Ribosome $<r^2> (m^2)$')
+        axarr[0].scatter(scaled_x, rib_msd, color='blue', s=2)
+        rib_trendline, = axarr[0].plot(scaled_x, rib_m*(ts)+rib_b, color='red', label='Ribosome MSD trendline')
+        plt.legend(handles=[rib_trendline])
         mod_ts = ts[1:]
         mod_msd = rib_msd[1:]
         rib_diffusion = np.divide(mod_msd, (6*mod_ts))
         rib_diffusion = np.mean(rib_diffusion[1:])
         logfile.write("ribosome msd linear fit: m={}, b={}, slope_err={}\n".format(rib_m,rib_b, rib_m/(6*diff_rib)))
-        logfile.write("ribosome diffusion coefficient={} (error: {})\n".format(rib_diffusion, rib_diffusion/diff_rib))
+        funthing = rib_msd / 6
+        d_m, d_b = np.polyfit(ts, funthing, 1)
+        logfile.write("ribosome Diff linear fit: m={}, b={}, slope_err={}\n".format(d_m,d_b, d_m/(5e-14)))
+
+    
     except EnvironmentError:
         logfile.write("No ribosome trajectory.\n")
-
+        f.delaxes(axarr[0])
+    
     try:
         prot_traj = HOOMDTrajectory(GSDFile(pfname, "rb", "HOOMD", "hoomd"))
         prot_pos0 = prot_traj.read_frame(0).particles.position
@@ -74,9 +88,14 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigm
         prot_m,prot_b = np.polyfit(ts, prot_msd, 1)
         ymin_p = np.min(prot_msd)
         ymax_p = np.max(prot_msd)
-        axarr[1].scatter(ts/dt, prot_msd, s=.2)
+        scaled_x = ts * 1e9
         axarr[1].set_ylim([ymin_p, ymax_p])
-        axarr[1].set_ylabel('$<r^2>$: Proteins')
+        axarr[1].set_ylabel('Protein $<r^2> (m^2)$')
+        xmax = np.max(scaled_x)
+        xmin = 0.0
+        axarr[1].set_xlim([xmin, xmax])
+        axarr[1].scatter(scaled_x, prot_msd, s=2, color='blue')
+        prot_trendline = axarr[1].plot(scaled_x, prot_m*(ts)+prot_b, color='red', label='Protein MSD trendline')
         mod_ts = ts[1:]
         mod_msd = prot_msd[1:]
         prot_diffusion = np.divide(mod_msd, (6*mod_ts))
@@ -86,12 +105,37 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigm
         
     except EnvironmentError:
         logfile.write("No protein trajectory.\n")
-
+        print type(axarr[1])
+        f.delaxes(axarr[1])
+    
 
     logfile.close()
+    plt.xlabel('time (ns)')
     plt.show()
-    """ 
+      
     # display pdf
+        
+    if (rib_traj):
+        pos0 = rib_traj.read_frame(0).particles.position
+        posFinal = np.zeros(pos0.shape[0])
+        finalFrame = rib_traj.read_frame(rib_traj.file.nframes-1)
+        posFinal = finalFrame.particles.position
+        maxb = 200e-9
+        dr = sigma_rr * 5 
+        edge = maxb/dr
+        phys.pdf(posFinal, dr, 200e-9, rho, sigma_rr, sigma_rp, sigma_pp)
+
+    if (prot_traj):
+        pos0 = prot_traj.read_frame(0).particles.position
+        posFinal = np.zeros(pos0.shape[0])
+        finalFrame = prot_traj.read_frame(prot_traj.file.nframes-1)
+        posFinal = finalFrame.particles.position
+        maxb = 200e-9
+        dr = sigma_pp * 5 
+        edge = maxb/dr
+        phys.pdf(posFinal, dr, 200e-9, rho, sigma_rr, sigma_rp, sigma_pp)
+
+
     atfname = directory + 'aggregatetraj' + str(h) + '.gsd'
     agg_traj = HOOMDTrajectory(GSDFile(atfname, "rb", "HOOMD", "hoomd"))
     pos0 = agg_traj.read_frame(0).particles.position
@@ -99,9 +143,10 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigm
     finalFrame = agg_traj.read_frame(agg_traj.file.nframes-1)
     posFinal = finalFrame.particles.position
     maxb = 200e-9
-    dr = 10e-9
+    dr = sigma_pp * 5 
     edge = maxb/dr
     phys.pdf(posFinal, dr, 200e-9, rho, sigma_rr, sigma_rp, sigma_pp)
+
 
 
 # Analyze a trajectory file
@@ -127,7 +172,7 @@ diff_rib = float(d['Ribosome diffusion coefficient'])
 diff_prot = float(d['Protein diffusion coefficient'])
 box_size = float(d['Edge length'])
 rho = float(d['Simulation density (particle volume/simulation volume)'])
-sigma_rr = float(d['LJ sigma for RR interaction'])
-sigma_rp = float(d['LJ sigma for RP interaction'])
-sigma_pp = float(d['LJ sigma for PP interaction'])
-analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, sigma_rr, sigma_rp, sigma_pp)
+rmin_rr = float(d['LJ sigma for RR interaction']) * pow(2, 1/6.)
+rmin_rp = float(d['LJ sigma for RP interaction']) * pow(2, 1/6.)
+rmin_pp = float(d['LJ sigma for PP interaction']) * pow(2, 1/6.)
+analyze(directory, h, dt, diff_rib, diff_prot, box_size, rho, rmin_rr, rmin_rp, rmin_pp)

@@ -24,12 +24,12 @@ k_b = 1.380648e-23 # Boltzmann constant, in J/K
 kT = k_b * T
 seed = 42
 dt = 1e-12 # Delta t
-sim_t = 1e6 # Simulation time steps
+sim_t = 100  # Simulation time steps
 use_planar_wall = False # planar wall potentials
 use_sphere_wall = True # sphere wall potential
 interacting = True # enable potentials
 cell_radius = 200e-9 # Radius of minimal cell
-frame_period = 100 # how often to write trajectories
+frame_period = 1 # how often to write trajectories
 box_size = 400e-9 # length of any one side of simulation box
 
 # Ribosomes
@@ -44,12 +44,11 @@ diff_prot = 10e-12 # protein diffusion constant
 diam_prot = 2e-9
 gamma_p = kT / diff_prot
 
-
 def run():
     """Run the simulation."""
 
     # Initialize the context
-    hoomd.context.initialize("")
+    hoomd.context.initialize("--gpu=1")
 
     # Read in a particle configuration
     particles = list()
@@ -79,28 +78,42 @@ def run():
     system = hoomd.init.read_snapshot(snapshot)
     system_particles = system.particles
 
-    # Create the neighbor list (acceleration structure) 
-    nl = hoomd.md.nlist.cell(r_buff=1e-9)
+    # Create the neighbor lists (acceleration structure) 
+    r_nl = hoomd.md.nlist.tree(r_buff=1e-9)
+    p_nl = hoomd.md.nlist.cell(r_buff=1e-10)
    
     # Specify the Lennard-Jones potential
-    rr_sigma = diam_rib/2 
+    rr_sigma = diam_rib/2 + (diam_rib/2)*0.2
     rr_epsilon = 1.69e-20
-    rp_sigma = (diam_rib/2 + diam_prot/2)/2
+    rp_sigma = diam_rib/2 + diam_prot/2 + (diam_rib/2 + diam_prot/2)*0.2
     rp_epsilon = 1.69e-20 
-    pp_sigma = diam_prot/2
+    pp_sigma = diam_prot/2 + (diam_prot/2)*0.2
     pp_epsilon = 1.69e-20 
     rr_cutoff = diam_rib*1.5
     rp_cutoff = diam_rib*1.5
     pp_cutoff = diam_prot*1.5
     alpha = 1.0
     if interacting:
-        lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=nl)
-        lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, alpha=alpha)
-        lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, 
+       
+        # Ribosome-scale neighbor list
+        r_lj = hoomd.md.pair.lj(r_cut=rr_cutoff, nlist=r_nl)
+        r_lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, 
+                            r_cut=rr_cutoff, alpha=alpha)
+        r_lj.pair_coeff.set('P','P', epsilon=rp_epsilon, sigma=rp_sigma, 
+                            r_cut=0.0, alpha=alpha)
+        r_lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, 
                             r_cut=rp_cutoff, alpha=alpha)
-        lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, 
+               
+        # Protein-scale neighbor list 
+        p_lj = hoomd.md.pair.lj(r_cut=pp_cutoff, nlist=p_nl)
+        p_lj.pair_coeff.set('R','R', epsilon=rr_epsilon, sigma=rr_sigma, 
+                            r_cut=0.0, alpha=alpha)
+        p_lj.pair_coeff.set('P','P', epsilon=pp_epsilon, sigma=pp_sigma, 
                             r_cut=pp_cutoff, alpha=alpha)
-
+        p_lj.pair_coeff.set('R','P', epsilon=rp_epsilon, sigma=rp_sigma, 
+                            r_cut=0.0, alpha=alpha)
+       
+         
     # Wall potentials
     if use_planar_wall:
         wall_bottom = hoomd.md.wall.plane(origin=(0, 0, -box_size/2), 
@@ -126,7 +139,7 @@ def run():
     elif use_sphere_wall:
         sphere_potential = hoomd.md.wall.sphere(cell_radius)
         all_walls = hoomd.md.wall.group([sphere_potential])
-        wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*5)
+        wlj = hoomd.md.wall.lj(all_walls, r_cut=diam_rib*1.1)
         wlj.force_coeff.set('R', sigma=rr_sigma, epsilon=rr_epsilon, alpha=0.0)
         wlj.force_coeff.set('P', sigma=rr_sigma, epsilon=rr_epsilon, alpha=0.0)
         wlj.force_coeff.set(['R','P'], sigma=rp_sigma, epsilon=rp_epsilon, alpha=0.0)
