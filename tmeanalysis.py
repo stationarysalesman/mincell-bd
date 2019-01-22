@@ -14,7 +14,7 @@ def analyze(directory, h, dt, diff_rib, diff_prot, box_size):
         logfile = open(fname, 'a')
         logfile.write('Calculations based on trajectories:\n')
     except EnvironmentError:
-        print "404 file not found :("
+        print("404 file not found :(")
         sys.exit(1)
 
     ts = []

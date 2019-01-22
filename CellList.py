@@ -81,19 +81,13 @@ class CellList:
 
      
 
-box_size = 400e-9 
-split = 20
-edge = float(box_size / split)
-num_particles = 6000 
-r_vdwr = 10e-9
-p_vdwr = 1e-9
-
+box_size = 1.82e-3 
+edge = box_size / 20.
+num_particles = 1000 
+p_vdwr = 2e-9
+thresh = 10e-9
 euc = lambda a1, a2: np.sqrt(np.sum(np.square(np.diff((a1,a2), axis=0))))
-
-
 clist = CellList(edge)
-
-r = 200e-9
 
 def rand_pos():
     r1 = random.uniform(0, box_size)
@@ -113,60 +107,18 @@ def valid(particle):
         neighbor_pos = neighbor.pos
         neighbor_vdwr = neighbor.vdwr
         dist = euc(p_pos, neighbor_pos)
-        thresh = p_vdwr + neighbor_vdwr
         if dist <= thresh:
             return False
-
-    """
-    # Too close to wall?
-    wall_points = list()
-    for i in range(3):
-        new_p = list(p_pos)
-        new_p[i] = 0.0 
-        wall_points.append(new_p)
-        new_p = list(p_pos)
-        new_p[i] = box_size
-        wall_points.append(new_p)
-
-    for p in wall_points:
-        dist = euc(p_pos, p)
-        if dist <= 5*p_vdwr:
-            return False
-    """
-
-    # Within the sphere, and far enough away from potential?
-    r = 200e-9
-    a = np.array(p_pos)
-    a -= (r, r, r)
-    r_dist = np.sqrt(np.sum(a*a))
-    if r_dist <= r * 0.9:
-        return True 
-
-    else:
-        return False 
-
-
-# Place the ribosomes
-nr = raw_input("Number of ribosomes: ")
-for i in range(int(nr)):
-    print "Sampling position for ribosome " + str(i) + "."
-    p = rand_pos()
-    particle = Particle('R', r_vdwr, p) 
-    while not valid(particle):
-        #print "Resampling..."
-        p = rand_pos()
-        particle.pos = p 
-    clist.insert(particle)
-
-
+    return True
+ 
 # Place the proteins
-_np = raw_input("Number of proteins: ")
+_np = input("Number of proteins: ")
 for i in range(int(_np)):
-    print "Sampling position for particle " + str(i) + "." 
+    print("Sampling position for particle " + str(i) + ".")
     z = rand_pos()
     particle = Particle('P', p_vdwr, z) 
     while not valid(particle):
-        #print "Resampling..."
+        #print("Resampling...")
         z = rand_pos()
         particle.pos = z 
     clist.insert(particle)
@@ -177,4 +129,4 @@ clist.translate(origin)
 clist.export()
 
 # Acceptance test (slow: O(n^2))
-#print "Test result: " + str(clist.test())
+#print("Test result: " + str(clist.test()))
